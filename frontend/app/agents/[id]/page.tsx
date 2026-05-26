@@ -2,6 +2,9 @@
 
 import React, { use, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { usePrivy, useSendTransaction } from "@privy-io/react-auth";
+import { encodeFunctionData } from "viem";
+import ReactMarkdown from "react-markdown";
 import { useApp } from "../../context/AppContext";
 import {
   Bot,
@@ -15,6 +18,7 @@ import {
   TrendingUp,
   CreditCard,
   Copy,
+  Check,
   ExternalLink,
   RefreshCw,
   Sparkles,
@@ -38,8 +42,27 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
     toggleRule,
     deleteRule,
     addChatMessage,
+    setAgentChats,
     triggerToast,
   } = useApp();
+
+  const { getAccessToken, authenticated, ready } = usePrivy();
+  const { sendTransaction } = useSendTransaction();
+
+  // Arc testnet USDC constants
+  const USDC_CONTRACT = "0x3600000000000000000000000000000000000000" as `0x${string}`;
+  const USDC_DECIMALS = 6;
+  const ARC_CHAIN_ID = 5042002;
+  const USDC_TRANSFER_ABI = [{
+    name: "transfer",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to",     type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+  }] as const;
 
   const agent = agents.find((a) => a.id === id);
   const agentRules = rules[id] || [];
@@ -47,9 +70,122 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
   const [inputValue, setInputValue] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [isThinking, setIsThinking] = useState(false);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [logs, setLogs] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleCopyMessage = (text: string, msgId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMsgId(msgId);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  };
+
+  // Fund Vault modal state
+  const [fundModalOpen, setFundModalOpen] = useState(false);
+  const [fundAmount, setFundAmount] = useState("");
+  const [fundCopied, setFundCopied] = useState(false);
+  const [fundSending, setFundSending] = useState(false);
+  const [fundTxHash, setFundTxHash] = useState<string | null>(null);
+  const [fundError, setFundError] = useState<string | null>(null);
+
+  const handleCopyFundAddress = () => {
+    navigator.clipboard.writeText(agent?.wallet ?? "");
+    setFundCopied(true);
+    setTimeout(() => setFundCopied(false), 2000);
+  };
+
+  const openFundModal = (amount?: number) => {
+    if (amount) setFundAmount(String(amount));
+    setFundModalOpen(true);
+    setFundTxHash(null);
+    setFundError(null);
+    setFundSending(false);
+  };
+
+  const handleSendFromWallet = async () => {
+    const parsedAmount = parseFloat(fundAmount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      setFundError("Please enter a valid amount.");
+      return;
+    }
+    if (!agent?.wallet) {
+      setFundError("Agent wallet address not found.");
+      return;
+    }
+
+    setFundSending(true);
+    setFundError(null);
+    setFundTxHash(null);
+
+    try {
+      const amountRaw = BigInt(Math.round(parsedAmount * 10 ** USDC_DECIMALS));
+      const calldata = encodeFunctionData({
+        abi: USDC_TRANSFER_ABI,
+        functionName: "transfer",
+        args: [agent.wallet as `0x${string}`, amountRaw],
+      });
+      const receipt = await sendTransaction({
+        to: USDC_CONTRACT,
+        data: calldata,
+        chainId: ARC_CHAIN_ID,
+      });
+      setFundTxHash(receipt.hash);
+      triggerToast?.(`${parsedAmount} USDC sent to ${agent.name}'s vault!`, "success");
+    } catch (err: any) {
+      const msg = err?.message?.includes("rejected")
+        ? "Transaction rejected in wallet."
+        : err?.message ?? "Transaction failed.";
+      setFundError(msg);
+    } finally {
+      setFundSending(false);
+    }
+  };
+
+  // Load chat history from NestJS backend on mount / agent change
+  useEffect(() => {
+    if (!authenticated || !agent) return;
+
+    const loadChatHistory = async () => {
+      try {
+        const token = await getAccessToken();
+        if (!token) return;
+
+        // 1. Fetch sessions
+        const sessionsRes = await fetch("http://localhost:3001/chat/sessions", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!sessionsRes.ok) return;
+        const sessions = await sessionsRes.json();
+        const activeSession = sessions.find((s: any) => s.agentId === id);
+
+        if (activeSession) {
+          setSessionId(activeSession.id);
+
+          // 2. Fetch messages
+          const msgRes = await fetch(`http://localhost:3001/chat/sessions/${activeSession.id}/messages`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (msgRes.ok) {
+            const dbMessages = await msgRes.json();
+            const mappedMessages = dbMessages.map((m: any) => ({
+              id: m.id,
+              sender: m.role === "user" ? "user" : "agent",
+              text: m.content,
+              timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            }));
+            setAgentChats(id, mappedMessages);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading chat history from backend:", err);
+      }
+    };
+
+    loadChatHistory();
+  }, [id, authenticated, agent]);
 
   // Initialize logs
   useEffect(() => {
@@ -110,6 +246,24 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
     }
   }, [logs]);
 
+  const isMockId = id === "agent-1" || id === "agent-2";
+  const isStillLoading = !ready || (authenticated && !agent && !isMockId);
+
+  if (isStillLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4 select-none">
+        <div className="relative w-12 h-12 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full border-t-2 border-r-2 border-indigo-500 animate-spin" />
+          <Bot className="w-5 h-5 text-indigo-400 animate-pulse" />
+        </div>
+        <div className="text-center">
+          <p className="text-xs font-semibold text-slate-300">Syncing Secure Workspace...</p>
+          <p className="text-[10px] text-slate-500 mt-1">Connecting to Circle wallet and loading cognitive memory</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!agent) {
     return (
       <div className="flex flex-col items-center justify-center h-96 gap-4 select-none">
@@ -118,7 +272,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
         </div>
         <div className="text-center">
           <h2 className="text-lg font-bold text-white">Agent Not Found</h2>
-          <p className="text-xs text-slate-400 mt-1">The requested wallet agent agent ID does not exist.</p>
+          <p className="text-xs text-slate-400 mt-1">The requested wallet agent ID does not exist.</p>
         </div>
         <button
           onClick={() => router.push("/agents")}
@@ -137,64 +291,121 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSendChat = (e: React.FormEvent) => {
+  const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isThinking) return;
 
     const userText = inputValue.trim();
     addChatMessage(id, userText, "user");
     setInputValue("");
+    setIsThinking(true);
 
-    // Simulate Agent reply
-    setTimeout(() => {
-      let replyText = "";
-      let customData = null;
+    try {
+      const token = await getAccessToken();
+      const res = await fetch("http://localhost:3001/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: userText,
+          agentId: id,
+          sessionId,
+        }),
+      });
 
-      const lowerText = userText.toLowerCase();
-      if (lowerText.includes("rebalance") || lowerText.includes("reinvest")) {
-        replyText = `Understood. I am starting a rebalance simulation for your vault. I will check the asset pool ratios and execute a test swap.`;
-        customData = {
-          type: "simulation",
-          title: "Simulation Pre-Run",
-          details: [
-            { label: "Target Ratio", value: "80% USDC / 20% ARC" },
-            { label: "Current Balance", value: `${agent.balance} USDC` },
-            { label: "Estimated Gas", value: "0.0042 ARC" },
-            { label: "Status", value: "Ready to Simulate" },
-          ],
-          showExecuteButton: true,
-        };
-      } else if (lowerText.includes("swap") || lowerText.includes("buy") || lowerText.includes("sell")) {
-        replyText = `Acknowledged. Simulating a swap request on Arc L1 via Circle's sandbox. Processing trial calculation...`;
-        customData = {
-          type: "transaction_preview",
-          title: "Onchain Swap Simulation",
-          details: [
-            { label: "Action", value: "Swap 50 USDC for ARC" },
-            { label: "Execution Pool", value: "ArcSwap v2 DEX" },
-            { label: "Min Received", value: "102.4 ARC" },
-            { label: "Gas Estimation", value: "0.0031 ARC" },
-          ],
-          showExecuteButton: true,
-        };
-      } else if (lowerText.includes("rule") || lowerText.includes("rules") || lowerText.includes("guardrail")) {
-        const activeRules = agentRules.filter((r) => r.active);
-        replyText = `I currently have ${agentRules.length} rules configured (${activeRules.length} active). You can view the telemetry panel to toggle them or click 'Manage Rules' to configure custom visual triggers.`;
-      } else if (lowerText.includes("balance") || lowerText.includes("vault") || lowerText.includes("usdc")) {
-        replyText = `Querying Circle Sandbox secure wallets... Node reports: Vault balance is currently ${agent.balance.toLocaleString()} ${agent.token}. All keys secure.`;
-      } else {
-        replyText = `Hello! I am ${agent.name}, your automated assistant. I monitor block events and execute custom logic under the guardrails you configure. Type "swap USDC to ARC" or "simulate portfolio rebalance" to run interactive commands.`;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        addChatMessage(id, `⚠️ ${err.message || 'The agent returned an error. Check your API key in agent settings.'}`, "agent");
+        return;
       }
 
-      addChatMessage(id, replyText, "agent", customData);
+      const data = await res.json();
 
-      // Append to daemon logs
-      setLogs((prev) => [
-        ...prev,
-        `[USER_CMD] [${new Date().toLocaleTimeString()}] Processed command: "${userText}"`,
-        `[DAEMON] [${new Date().toLocaleTimeString()}] Sent cognitive reply: "${replyText.slice(0, 50)}..."`,
-      ]);
-    }, 800); // quick reply simulation
+      // Persist session for conversation continuity
+      if (data.sessionId && !sessionId) setSessionId(data.sessionId);
+
+      // Build structured card data from response
+      let customData: any = null;
+      const actions = data.structuredData?.actions ?? [];
+      const txAction = actions.find((a: any) => a.type === 'sign_transaction');
+      const fundAction = actions.find((a: any) => a.type === 'fund_agent');
+
+      if (txAction?.payload) {
+        const p = txAction.payload;
+        customData = {
+          type: "transaction_preview",
+          title: "Transaction Preview",
+          details: [
+            { label: "From",     value: `${p.fromAddress?.slice(0, 14)}...` },
+            { label: "To",       value: `${p.toAddress?.slice(0, 14)}...` },
+            { label: "Amount",   value: `${p.amountUsdc} USDC` },
+            { label: "Est. Gas", value: p.estimatedGas ?? "—" },
+          ],
+          showExecuteButton: false,
+          warning: p.warning,
+        };
+      } else if (fundAction?.payload) {
+        const p = fundAction.payload;
+
+        // If the AI was told an amount, auto-execute the transfer immediately
+        if (p.requestedAmount && p.depositAddress) {
+          addChatMessage(id, `⏳ Sending ${p.requestedAmount} USDC to **${p.agentName}**'s vault...`, "agent");
+
+          try {
+            const amountRaw = BigInt(Math.round(p.requestedAmount * 10 ** USDC_DECIMALS));
+            const calldata = encodeFunctionData({
+              abi: USDC_TRANSFER_ABI,
+              functionName: "transfer",
+              args: [p.depositAddress as `0x${string}`, amountRaw],
+            });
+
+            const receipt = await sendTransaction({
+              to: USDC_CONTRACT,
+              data: calldata,
+              chainId: ARC_CHAIN_ID,
+            });
+
+            addChatMessage(
+              id,
+              `✅ **${p.requestedAmount} USDC** sent to **${p.agentName}**!\n\nTx: \`${receipt.hash}\`\n\n[View on Explorer](https://testnet.arcscan.app/tx/${receipt.hash})`,
+              "agent",
+            );
+            triggerToast?.(`${p.requestedAmount} USDC sent to ${p.agentName}`, "success");
+          } catch (txErr: any) {
+            const reason = txErr?.message?.includes("rejected")
+              ? "Transaction rejected in wallet."
+              : txErr?.message ?? "Transaction failed.";
+            addChatMessage(id, `⚠️ Transfer failed: ${reason}`, "agent");
+          }
+        } else {
+          // No amount specified — show the funding card so user can choose
+          customData = {
+            type: "fund_agent",
+            title: `Fund ${p.agentName}`,
+            depositAddress: p.depositAddress,
+            requestedAmount: p.requestedAmount,
+            agentId: p.agentId,
+          };
+        }
+      }
+
+      // Log tool usage in daemon panel
+      if (data.toolsUsed?.length > 0) {
+        setLogs((prev) => [
+          ...prev,
+          `[LLM] [${new Date().toLocaleTimeString()}] Provider responded. Tools used: ${data.toolsUsed.join(', ')}`,
+          `[LLM] [${new Date().toLocaleTimeString()}] Confidence: ${((data.confidence ?? 0) * 100).toFixed(0)}%`,
+        ]);
+      }
+
+      addChatMessage(id, data.message, "agent", customData);
+    } catch {
+      addChatMessage(id, "⚠️ Connection error — is the backend running on port 3001?", "agent");
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   const handleExecuteSimulatedAction = (actionTitle: string) => {
@@ -226,6 +437,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
   ];
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 select-none h-full relative">
       
       {/* LEFT SIDE: Chat Workspace */}
@@ -268,7 +480,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
           {agentMessages.map((msg) => {
             const isUser = msg.sender === "user";
             return (
-              <div key={msg.id} className={`flex gap-3 max-w-[85%] ${isUser ? "ml-auto flex-row-reverse" : "mr-auto"}`}>
+              <div key={msg.id} className={`flex gap-3 max-w-[85%] group/msg ${isUser ? "ml-auto flex-row-reverse" : "mr-auto"}`}>
                 <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center border ${
                   isUser
                     ? "bg-neon-purple/10 border-neon-purple/20 text-neon-purple"
@@ -278,39 +490,118 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <div className={`p-3.5 rounded-2xl text-xs leading-relaxed border ${
+                  <div className={`relative p-3.5 rounded-2xl text-xs leading-relaxed border ${
                     isUser
                       ? "bg-[#090A0F]/80 border-neon-purple/10 text-slate-100 rounded-tr-none"
                       : "bg-[#090A0F]/90 border-[#22252F] text-slate-200 rounded-tl-none"
                   }`}>
-                    {msg.text}
+                    {/* Copy button — agent messages only, shows on hover */}
+                    {!isUser && (
+                      <button
+                        onClick={() => handleCopyMessage(msg.text, msg.id)}
+                        className="absolute top-2 right-2 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded-md bg-[#15161C] border border-[#22252F] text-slate-400 hover:text-white cursor-pointer"
+                        title="Copy response"
+                      >
+                        {copiedMsgId === msg.id
+                          ? <Check className="w-3 h-3 text-neon-cyan" />
+                          : <Copy className="w-3 h-3" />}
+                      </button>
+                    )}
+
+                    {/* Message body — markdown for agent, plain for user */}
+                    {isUser ? (
+                      <span>{msg.text}</span>
+                    ) : (
+                      <div className="prose-agent">
+                        <ReactMarkdown
+                          components={{
+                            h1: ({children}) => <h1 className="text-sm font-bold text-white mb-2 mt-1">{children}</h1>,
+                            h2: ({children}) => <h2 className="text-xs font-bold text-white mb-1.5 mt-2">{children}</h2>,
+                            h3: ({children}) => <h3 className="text-xs font-semibold text-slate-200 mb-1 mt-1.5">{children}</h3>,
+                            p:  ({children}) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                            strong: ({children}) => <strong className="font-bold text-white">{children}</strong>,
+                            em: ({children}) => <em className="text-slate-300 italic">{children}</em>,
+                            code: ({children, className}) => {
+                              const isBlock = className?.includes('language-');
+                              return isBlock
+                                ? <code className="block bg-[#0a0b10] border border-[#22252F] rounded-lg p-2.5 font-mono text-[9px] text-neon-cyan overflow-x-auto my-2 whitespace-pre">{children}</code>
+                                : <code className="bg-[#0a0b10] border border-[#22252F] rounded px-1.5 py-0.5 font-mono text-[9px] text-neon-cyan">{children}</code>;
+                            },
+                            pre: ({children}) => <pre className="my-0">{children}</pre>,
+                            ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-0.5 text-slate-300">{children}</ul>,
+                            ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-0.5 text-slate-300">{children}</ol>,
+                            li: ({children}) => <li className="text-xs">{children}</li>,
+                            hr: () => <hr className="border-[#22252F] my-2" />,
+                            a:  ({href, children}) => <a href={href} target="_blank" rel="noreferrer" className="text-neon-blue underline hover:text-neon-cyan transition-colors">{children}</a>,
+                            blockquote: ({children}) => <blockquote className="border-l-2 border-neon-blue/30 pl-3 italic text-slate-400 my-1">{children}</blockquote>,
+                          }}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
+                      </div>
+                    )}
 
                     {/* Interactive payload block */}
                     {msg.data && (
                       <div className="mt-3 p-3 rounded-xl bg-[#090A0F]/70 border border-[#22252F] flex flex-col gap-2.5">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-neon-cyan flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          {msg.data.title}
-                        </span>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                          {msg.data.details.map((detail: any, idx: number) => (
-                            <div key={idx} className="flex flex-col gap-0.5 border-r border-[#22252F] last:border-0 pr-2">
-                              <span className="text-[8px] text-slate-500 font-bold uppercase">{detail.label}</span>
-                              <span className="text-[10px] text-white font-mono font-semibold">{detail.value}</span>
-                            </div>
-                          ))}
-                        </div>
 
-                        {msg.data.showExecuteButton && (
-                          <button
-                            onClick={() => handleExecuteSimulatedAction(msg.data.title)}
-                            type="button"
-                            className="mt-1 h-7 rounded-lg bg-neon-blue text-slate-950 font-bold text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all"
-                          >
-                            Execute Sandboxed Tx
-                            <ArrowRight className="w-3 h-3" />
-                          </button>
+                        {/* Fund Agent Card */}
+                        {msg.data.type === "fund_agent" ? (
+                          <>
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-neon-blue flex items-center gap-1">
+                              <CreditCard className="w-3 h-3" />
+                              {msg.data.title}
+                            </span>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[8px] text-slate-500 font-bold uppercase">Deposit Address</span>
+                              <div className="flex items-center gap-2 bg-[#090A0F] rounded-lg px-2 py-1.5 border border-[#22252F]">
+                                <span className="text-[9px] font-mono text-slate-300 truncate flex-1">{msg.data.depositAddress}</span>
+                                <button
+                                  onClick={() => { navigator.clipboard.writeText(msg.data.depositAddress); }}
+                                  className="text-slate-500 hover:text-neon-cyan transition-colors cursor-pointer"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                            {msg.data.requestedAmount && (
+                              <div className="text-[9px] text-slate-400">
+                                Requested: <span className="text-white font-bold">{msg.data.requestedAmount} USDC</span>
+                              </div>
+                            )}
+                            <button
+                              onClick={() => openFundModal(msg.data.requestedAmount)}
+                              className="mt-1 h-7 rounded-lg bg-neon-blue text-slate-950 font-bold text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all"
+                            >
+                              <CreditCard className="w-3 h-3" />
+                              Fund Now
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-neon-cyan flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" />
+                              {msg.data.title}
+                            </span>
+                            <div className="grid grid-cols-2 gap-2">
+                              {msg.data.details?.map((detail: any, idx: number) => (
+                                <div key={idx} className="flex flex-col gap-0.5 border-r border-[#22252F] last:border-0 pr-2">
+                                  <span className="text-[8px] text-slate-500 font-bold uppercase">{detail.label}</span>
+                                  <span className="text-[10px] text-white font-mono font-semibold">{detail.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {msg.data.showExecuteButton && (
+                              <button
+                                onClick={() => handleExecuteSimulatedAction(msg.data.title)}
+                                type="button"
+                                className="mt-1 h-7 rounded-lg bg-neon-blue text-slate-950 font-bold text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all"
+                              >
+                                Execute Sandboxed Tx
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
@@ -322,6 +613,19 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
               </div>
             );
           })}
+          {/* Typing indicator */}
+          {isThinking && (
+            <div className="flex gap-3 max-w-[85%] mr-auto">
+              <div className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center border bg-neon-blue/10 border-neon-blue/20 text-neon-blue">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div className="p-3.5 rounded-2xl rounded-tl-none bg-[#090A0F]/90 border border-[#22252F] flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-neon-blue/60 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-1.5 h-1.5 bg-neon-blue/60 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-1.5 h-1.5 bg-neon-blue/60 rounded-full animate-bounce" />
+              </div>
+            </div>
+          )}
           <div ref={chatEndRef} />
         </div>
 
@@ -345,14 +649,16 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
           <form onSubmit={handleSendChat} className="flex items-center gap-2">
             <input
               type="text"
-              placeholder={`Send message to ${agent.name}...`}
+              placeholder={isThinking ? `${agent.name} is thinking...` : `Send message to ${agent.name}...`}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              className="flex-1 h-11 px-4 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-neon-blue/50 transition-all"
+              disabled={isThinking}
+              className="flex-1 h-11 px-4 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-neon-blue/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
               type="submit"
-              className="w-11 h-11 rounded-xl bg-neon-blue text-slate-950 font-bold flex items-center justify-center shrink-0 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
+              disabled={isThinking}
+              className="w-11 h-11 rounded-xl bg-neon-blue text-slate-950 font-bold flex items-center justify-center shrink-0 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
             >
               <Send className="w-4 h-4" />
             </button>
@@ -414,11 +720,20 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
           {/* Quick numbers grid */}
           <div className="grid grid-cols-2 gap-4 mt-2">
-            <div className="p-3.5 rounded-xl bg-[#090A0F]/40 border border-[#22252F] flex flex-col gap-0.5">
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Vault Balance</span>
-              <span className="text-sm font-extrabold text-white font-mono">
-                {agent.balance.toLocaleString()} {agent.token}
-              </span>
+            <div className="col-span-2 p-3.5 rounded-xl bg-[#090A0F]/40 border border-neon-blue/10 flex items-center justify-between">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Vault Balance</span>
+                <span className="text-sm font-extrabold text-white font-mono">
+                  {agent.balance.toLocaleString()} {agent.token}
+                </span>
+              </div>
+              <button
+                onClick={() => openFundModal()}
+                className="h-8 px-3.5 rounded-lg bg-neon-blue/10 border border-neon-blue/30 text-neon-blue font-bold text-[10px] uppercase flex items-center gap-1.5 cursor-pointer hover:bg-neon-blue/20 transition-all"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                Fund Vault
+              </button>
             </div>
             <div className="p-3.5 rounded-xl bg-[#090A0F]/40 border border-[#22252F] flex flex-col gap-0.5">
               <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Automated Rules</span>
@@ -549,5 +864,146 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
       </div>
 
     </div>
+
+      {/* ── Fund Vault Modal ─────────────────────────────────── */}
+      {fundModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          onClick={() => setFundModalOpen(false)}
+        >
+          <div
+            className="glass-panel bg-[#0e0f14] border-[#22252F] w-full max-w-md p-6 flex flex-col gap-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
+                  <CreditCard className="w-4.5 h-4.5 text-neon-blue" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white">Fund Agent Vault</h2>
+                  <p className="text-[10px] text-slate-500">Send USDC to {agent.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setFundModalOpen(false)}
+                className="text-slate-500 hover:text-white transition-colors cursor-pointer text-lg leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Amount presets */}
+            <div className="flex flex-col gap-2">
+              <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Amount (USDC)</label>
+              <div className="flex gap-2">
+                {[10, 25, 50, 100].map((preset) => (
+                  <button
+                    key={preset}
+                    onClick={() => setFundAmount(String(preset))}
+                    className={`flex-1 h-8 rounded-lg border text-[10px] font-bold cursor-pointer transition-all ${
+                      fundAmount === String(preset)
+                        ? 'border-neon-blue bg-neon-blue/15 text-neon-blue'
+                        : 'border-[#22252F] bg-[#090A0F] text-slate-400 hover:border-neon-blue/30'
+                    }`}
+                  >
+                    ${preset}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                min="0"
+                placeholder="Custom amount..."
+                value={fundAmount}
+                onChange={(e) => setFundAmount(e.target.value)}
+                className="h-10 px-4 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-neon-blue/50 transition-all"
+              />
+            </div>
+
+            {/* Deposit address */}
+            <div className="flex flex-col gap-2">
+              <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Agent Vault Address (Arc Testnet)</label>
+              <div className="flex items-center gap-2 bg-[#090A0F]/80 p-3 rounded-xl border border-[#22252F]">
+                <span className="text-[10px] font-mono text-slate-300 truncate flex-1 select-all">{agent.wallet}</span>
+                <button
+                  onClick={handleCopyFundAddress}
+                  className="p-1.5 rounded-lg bg-[#15161C] border border-[#22252F] text-slate-400 hover:text-neon-cyan transition-colors cursor-pointer shrink-0"
+                  title="Copy address"
+                >
+                  {fundCopied ? <Check className="w-3.5 h-3.5 text-neon-cyan" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <p className="text-[9px] text-slate-500 leading-relaxed">
+                Send USDC to this address from your connected wallet or any exchange. Funds are credited on Arc Testnet.
+              </p>
+            </div>
+
+            {/* CTA */}
+            {fundTxHash ? (
+              <div className="flex flex-col gap-3 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                  <Check className="w-4 h-4" />
+                  {fundAmount} USDC sent successfully!
+                </div>
+                <a
+                  href={`https://testnet.arcscan.app/tx/${fundTxHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] font-mono text-slate-400 hover:text-neon-cyan truncate transition-colors"
+                >
+                  Tx: {fundTxHash.slice(0, 20)}...{fundTxHash.slice(-8)} ↗
+                </a>
+                <button
+                  onClick={() => { setFundModalOpen(false); setFundTxHash(null); setFundAmount(""); }}
+                  className="h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xs cursor-pointer hover:bg-emerald-500/20 transition-all"
+                >
+                  Done
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {fundError && (
+                  <div className="text-[10px] text-red-400 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">
+                    ⚠️ {fundError}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      handleCopyFundAddress();
+                      triggerToast?.(`Address copied — send ${fundAmount || '?'} USDC to ${agent.name}'s vault`, "success");
+                    }}
+                    disabled={fundSending}
+                    className="flex-1 h-10 rounded-xl border border-neon-blue/30 bg-neon-blue/5 text-neon-blue font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:bg-neon-blue/10 transition-all disabled:opacity-40"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy Address
+                  </button>
+                  <button
+                    onClick={handleSendFromWallet}
+                    disabled={fundSending || !fundAmount}
+                    className="flex-1 h-10 rounded-xl bg-neon-blue text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+                  >
+                    {fundSending ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-3.5 h-3.5" />
+                        Send {fundAmount ? `${fundAmount} USDC` : "USDC"}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

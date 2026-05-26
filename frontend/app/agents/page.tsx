@@ -3,27 +3,45 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "../context/AppContext";
-import { Bot, Plus, Play, Pause, Trash2, Cpu, Settings, ExternalLink, Sparkles } from "lucide-react";
+import { Bot, Plus, Play, Pause, ExternalLink, Eye, EyeOff, Zap, TrendingDown, RefreshCw, Bell, MessageSquare, ArrowRight, Copy } from "lucide-react";
 import MetricCard from "../components/MetricCard";
+
+const LLM_PROVIDERS = [
+  { id: "anthropic", label: "Anthropic", hint: "sk-ant-..." },
+  { id: "openai",    label: "OpenAI",    hint: "sk-proj-..." },
+  { id: "grok",      label: "Grok",      hint: "xai-..." },
+];
+
+const RULE_TEMPLATES = [
+  { icon: TrendingDown, label: "Stop-loss",   text: "If my USDC balance drops below 100, pause all swaps and alert me immediately." },
+  { icon: RefreshCw,    label: "Auto-compound", text: "Every 24 hours, reinvest any yield above 5 USDC back into the highest-APY pool." },
+  { icon: Zap,          label: "Swap trigger", text: "Swap 50 USDC to ARC whenever my USDC balance exceeds 1,000 USDC." },
+  { icon: Bell,         label: "Price alert",  text: "Alert me when ARC price drops more than 15% in a single hour." },
+];
 
 export default function AgentsPage() {
   const router = useRouter();
-  const { agents, rules, addAgent, toggleAgentStatus } = useApp();
+  const { agents, rules, addAgent, toggleAgentStatus, triggerToast } = useApp();
   const [modalOpen, setModalOpen] = useState(false);
 
   // Form states
   const [name, setName] = useState("");
-  const [model, setModel] = useState("Claude 3.5 Sonnet");
+  const [provider, setProvider] = useState("anthropic");
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
   const [ruleText, setRuleText] = useState("");
 
   const handleCreateAgentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    addAgent(name.trim(), model, ruleText.trim());
+    const modelLabel = LLM_PROVIDERS.find((p) => p.id === provider)?.label ?? provider;
+    addAgent(name.trim(), modelLabel, ruleText.trim(), { provider, apiKey });
     
     // Clear states
     setName("");
+    setApiKey("");
+    setShowKey(false);
     setRuleText("");
     setModalOpen(false);
   };
@@ -85,7 +103,11 @@ export default function AgentsPage() {
           return (
             <div
               key={agent.id}
-              className={`glass-panel border-[#22252F] bg-[#15161C] p-5 flex flex-col justify-between min-h-[220px] transition-all duration-300 relative overflow-hidden group hover:border-[#22252F]/80 ${
+              onClick={() => router.push(`/agents/${agent.id}`)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && router.push(`/agents/${agent.id}`)}
+              className={`glass-panel border-[#22252F] bg-[#15161C] p-5 flex flex-col justify-between min-h-[220px] transition-all duration-300 relative overflow-hidden group cursor-pointer hover:border-neon-blue/30 hover:bg-[#15161C]/90 ${
                 isPaused ? "opacity-60" : ""
               }`}
             >
@@ -109,7 +131,7 @@ export default function AgentsPage() {
 
                 {/* Status Toggle Button */}
                 <button
-                  onClick={() => toggleAgentStatus(agent.id)}
+                  onClick={(e) => { e.stopPropagation(); toggleAgentStatus(agent.id); }}
                   className={`h-8 px-3 rounded-lg border text-[10px] font-bold uppercase cursor-pointer flex items-center gap-1 transition-all ${
                     isPaused
                       ? "border-neon-cyan/20 bg-neon-cyan/5 text-neon-cyan hover:bg-neon-cyan/10"
@@ -133,9 +155,22 @@ export default function AgentsPage() {
               {/* Card Mid: Wallet info & balance */}
               <div className="flex flex-col gap-1 mt-4">
                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">Agent Vault</span>
-                <span className="text-[10px] font-mono text-slate-300 bg-[#090A0F]/60 p-2 rounded-lg border border-[#22252F] truncate">
-                  {agent.wallet}
-                </span>
+                <div className="flex items-center gap-2 bg-[#090A0F]/60 p-2 rounded-lg border border-[#22252F] justify-between relative group/address">
+                  <span className="text-[10px] font-mono text-slate-300 truncate select-all pr-8">
+                    {agent.wallet}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(agent.wallet);
+                      triggerToast?.("Agent wallet address copied!", "info");
+                    }}
+                    className="p-1 hover:bg-[#22252F] rounded text-slate-500 hover:text-white transition-colors absolute right-2 bg-[#090A0F]/60"
+                    title="Copy wallet address"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               {/* Card bottom: metrics & management controls */}
@@ -157,20 +192,25 @@ export default function AgentsPage() {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => router.push(`/agents/${agent.id}/dashboard`)}
+                    onClick={(e) => { e.stopPropagation(); router.push(`/agents/${agent.id}/dashboard`); }}
                     className="p-2 rounded-lg bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-slate-400 hover:text-white transition-colors cursor-pointer"
-                    title="View Agent Dashboard"
+                    title="View Analytics Dashboard"
                   >
                     <ExternalLink className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => router.push(`/agents/${agent.id}`)}
+                    onClick={(e) => { e.stopPropagation(); router.push(`/agents/${agent.id}`); }}
                     className="h-8 px-3 rounded-lg bg-neon-blue text-slate-950 font-bold text-[10px] uppercase flex items-center gap-1 cursor-pointer hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    <Settings className="w-3.5 h-3.5" />
-                    Configure Rules
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Open Chat
                   </button>
                 </div>
+              </div>
+
+              {/* Subtle hover arrow indicator */}
+              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                <ArrowRight className="w-3.5 h-3.5 text-neon-blue/50" />
               </div>
             </div>
           );
@@ -207,28 +247,79 @@ export default function AgentsPage() {
                 />
               </div>
 
-              {/* Model selection */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Cognitive Engine Model</label>
-                <select
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  className="h-10 px-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
-                >
-                  <option>Claude 3.5 Sonnet</option>
-                  <option>Grok 2.0</option>
-                  <option>GPT-4o</option>
-                </select>
+              {/* LLM Provider + API Key */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Cognitive Engine</label>
+                {/* Provider tabs */}
+                <div className="flex gap-1.5">
+                  {LLM_PROVIDERS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => { setProvider(p.id); setApiKey(""); }}
+                      className={`flex-1 h-8 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
+                        provider === p.id
+                          ? "border-neon-blue/60 bg-neon-blue/10 text-neon-blue"
+                          : "border-[#22252F] bg-[#090A0F] text-slate-400 hover:text-slate-200 hover:border-[#2e3140]"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                {/* API Key input */}
+                <div className="relative">
+                  <input
+                    id="agent-api-key"
+                    type={showKey ? "text" : "password"}
+                    placeholder={`Paste your ${LLM_PROVIDERS.find(p => p.id === provider)?.label} API key (${LLM_PROVIDERS.find(p => p.id === provider)?.hint})`}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                    required
+                    className="w-full h-10 pl-3.5 pr-10 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white font-mono focus:outline-none focus:border-neon-blue/50 placeholder:text-slate-600 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey((v) => !v)}
+                    aria-label={showKey ? "Hide API key" : "Show API key"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                  >
+                    {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <p className="text-[9px] text-slate-600 leading-relaxed">
+                  Your key is stored only in this agent&apos;s encrypted configuration and never logged.
+                </p>
               </div>
 
-              {/* Rules script text */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Natural Language Initial Rule</label>
+              {/* Natural Language Rule */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Initial Automation Rule <span className="text-slate-600 font-normal normal-case">(optional)</span></label>
+                {/* Quick-rule template chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {RULE_TEMPLATES.map((t) => (
+                    <button
+                      key={t.label}
+                      type="button"
+                      onClick={() => setRuleText(t.text)}
+                      className={`flex items-center gap-1 px-2.5 h-7 rounded-lg border text-[10px] font-semibold transition-all cursor-pointer ${
+                        ruleText === t.text
+                          ? "border-neon-cyan/50 bg-neon-cyan/10 text-neon-cyan"
+                          : "border-[#22252F] bg-[#090A0F] text-slate-400 hover:text-slate-200 hover:border-[#2e3140]"
+                      }`}
+                    >
+                      <t.icon className="w-3 h-3" />
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
                 <textarea
-                  placeholder="e.g. Swap 50 USDC for ARC whenever my USDC balance goes above 1000..."
+                  placeholder="Describe what your agent should do, or pick a template above..."
                   value={ruleText}
                   onChange={(e) => setRuleText(e.target.value)}
-                  className="p-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50 min-h-[70px] leading-relaxed"
+                  className="p-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50 min-h-[72px] leading-relaxed resize-none transition-colors placeholder:text-slate-600"
                 />
               </div>
             </div>

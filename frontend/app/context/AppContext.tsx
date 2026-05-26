@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { PrivyProvider, usePrivy, useWallets } from "@privy-io/react-auth";
+import { arcTestnet } from "viem/chains";
 
 // Types
 export interface Wallet {
@@ -80,12 +81,13 @@ interface AppContextType {
   connectWallet: (address?: string) => void;
   disconnectWallet: () => void;
   searchWallet: (address: string) => void;
-  addAgent: (name: string, model: string, initialRuleText?: string) => string;
+  addAgent: (name: string, model: string, initialRuleText?: string, llmConfig?: { provider: string; apiKey: string }) => Promise<string>;
   toggleAgentStatus: (agentId: string) => void;
   addRule: (agentId: string, ruleText: string, trigger?: string, action?: string) => void;
   toggleRule: (agentId: string, ruleId: string) => void;
   deleteRule: (agentId: string, ruleId: string) => void;
   addChatMessage: (chatId: string, text: string, sender: "user" | "agent", data?: any) => void;
+  setAgentChats: (agentId: string, messages: ChatMessage[]) => void;
   triggerToast: (message: string, type: Toast["type"]) => void;
   removeToast: (id: string) => void;
   addAlert: (condition: string, channel: string) => void;
@@ -252,7 +254,7 @@ const INITIAL_ACTIVITY: Activity[] = [
 export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
   const [explorerWallet, setExplorerWallet] = useState<string>("0x71C7656EC7ab88b098defB751B7401B5f6d8976F");
-  const { user: privyUser, authenticated } = usePrivy();
+  const { user: privyUser, authenticated, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
 
   // Automatically sync your real Privy EVM wallet address and balances into the frontend session
@@ -339,6 +341,46 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
   }, [authenticated, privyUser, wallets]);
 
   const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
+
+  // Load agents from NestJS backend when user is authenticated
+  useEffect(() => {
+    if (authenticated) {
+      const loadAgents = async () => {
+        try {
+          const token = await getAccessToken();
+          if (!token) return;
+
+          const res = await fetch("http://localhost:3001/agents", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const mappedAgents = data.map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              model: a.configuration?.model || "Claude 3.5 Sonnet",
+              status: a.status || "active",
+              wallet: a.wallet?.address || "No Wallet",
+              balance: a.balances?.[0]?.amount ? Number(a.balances[0].amount) : 0,
+              token: "USDC",
+              created: a.createdAt?.split("T")[0] || new Date().toISOString().split("T")[0],
+              rulesCount: a.configuration?.rulesCount || 0,
+              successRate: 100,
+              gasSpent: 0,
+            }));
+            setAgents(mappedAgents);
+          }
+        } catch (err) {
+          console.error("Error loading agents from backend:", err);
+        }
+      };
+      loadAgents();
+    } else {
+      setAgents(INITIAL_AGENTS);
+    }
+  }, [authenticated]);
   const [rules, setRules] = useState<Record<string, Rule[]>>(INITIAL_RULES);
   const [alerts, setAlerts] = useState<Alert[]>(INITIAL_ALERTS);
   const [chats, setChats] = useState<Record<string, ChatMessage[]>>(INITIAL_CHATS);
@@ -385,73 +427,111 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
     triggerToast(`Loaded data for wallet ${address.slice(0, 6)}...${address.slice(-4)}`, "success");
   };
 
-  const addAgent = (name: string, model: string, initialRuleText?: string) => {
-    const id = `agent-${Date.now()}`;
-    const walletAddress = `0xArcAgent${Math.random().toString(36).substring(2, 8)}Wallet`;
-    const newAgent: Agent = {
-      id,
-      name,
-      model,
-      status: "active",
-      wallet: walletAddress,
-      balance: 100.0, // initial USDC top-up
-      token: "USDC",
-      created: new Date().toISOString().split("T")[0],
-      rulesCount: initialRuleText ? 1 : 0,
-      successRate: 100.0,
-      gasSpent: 0.0,
-    };
+  const addAgent = async (name: string, model: string, initialRuleText?: string, llmConfig?: { provider: string; apiKey: string }) => {
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        triggerToast("Not authenticated with Privy.", "error");
+        return "";
+      }
 
-    setAgents((prev) => [...prev, newAgent]);
+      triggerToast(`Provisioning Circle wallet for "${name}"...`, "info");
 
-    // Initial rule if provided
-    if (initialRuleText) {
-      const newRule: Rule = {
-        id: `rule-${Date.now()}`,
-        text: initialRuleText,
-        trigger: "Natural Language Condition",
-        action: "Custom Action",
-        active: true,
-        lastTriggered: "Never",
-      };
-      setRules((prev) => ({
-        ...prev,
-        [id]: [newRule],
-      }));
-    } else {
-      setRules((prev) => ({
-        ...prev,
-        [id]: [],
-      }));
-    }
-
-    // Initialize chat
-    setChats((prev) => ({
-      ...prev,
-      [id]: [
-        {
-          id: `m-${Date.now()}`,
-          sender: "agent",
-          text: `Hello! I am ${name}, your new Personal Wallet Agent powered by the ${model} model. My Circle Agent Wallet is ready: ${walletAddress}. Please define rules or chat with me to begin.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      const res = await fetch("http://localhost:3001/agents", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      ],
-    }));
+        body: JSON.stringify({
+          name,
+          configuration: {
+            model,
+            provider: llmConfig?.provider ?? "anthropic",
+            // NOTE: API key is sent securely to backend; never stored in frontend state beyond this call
+            apiKey: llmConfig?.apiKey ?? "",
+            initialRuleText,
+            rulesCount: initialRuleText ? 1 : 0,
+          },
+        }),
+      });
 
-    // Add activity
-    const newAct: Activity = {
-      id: `act-${Date.now()}`,
-      type: "agent_creation",
-      title: `Agent Created: ${name}`,
-      description: `Provisioned agent wallet ${walletAddress.slice(0, 8)}...`,
-      wallet: walletAddress,
-      status: "success",
-      timestamp: new Date().toISOString().replace("T", " ").slice(0, 16),
-    };
-    setActivityLog((prev) => [newAct, ...prev]);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to create agent wallet in backend");
+      }
 
-    triggerToast(`Agent "${name}" created successfully!`, "success");
-    return id;
+      const a = await res.json();
+      
+      const newAgent: Agent = {
+        id: a.id,
+        name: a.name,
+        model,
+        status: "active",
+        wallet: a.wallet?.address || "No Wallet",
+        balance: 0,
+        token: "USDC",
+        created: a.createdAt?.split("T")[0] || new Date().toISOString().split("T")[0],
+        rulesCount: initialRuleText ? 1 : 0,
+        successRate: 100.0,
+        gasSpent: 0.0,
+      };
+
+      setAgents((prev) => [...prev, newAgent]);
+
+      // Initial rule if provided
+      if (initialRuleText) {
+        const newRule: Rule = {
+          id: `rule-${Date.now()}`,
+          text: initialRuleText,
+          trigger: "Natural Language Condition",
+          action: "Custom Action",
+          active: true,
+          lastTriggered: "Never",
+        };
+        setRules((prev) => ({
+          ...prev,
+          [a.id]: [newRule],
+        }));
+      } else {
+        setRules((prev) => ({
+          ...prev,
+          [a.id]: [],
+        }));
+      }
+
+      // Initialize chat
+      setChats((prev) => ({
+        ...prev,
+        [a.id]: [
+          {
+            id: `m-${Date.now()}`,
+            sender: "agent",
+            text: `Hello! I am ${name}, your new Personal Wallet Agent powered by the ${model} model. My Circle Agent Wallet is ready: ${a.wallet?.address}. Please define rules or chat with me to begin.`,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          },
+        ],
+      }));
+
+      // Add activity
+      const newAct: Activity = {
+        id: `act-${Date.now()}`,
+        type: "agent_creation",
+        title: `Agent Created: ${name}`,
+        description: `Provisioned agent wallet ${a.wallet?.address?.slice(0, 8)}...`,
+        wallet: a.wallet?.address || "",
+        status: "success",
+        timestamp: new Date().toISOString().replace("T", " ").slice(0, 16),
+      };
+      setActivityLog((prev) => [newAct, ...prev]);
+
+      triggerToast(`Agent "${name}" deployed successfully!`, "success");
+      return a.id;
+    } catch (err: any) {
+      console.error("Failed to deploy agent wallet:", err);
+      triggerToast(`Deployment failed: ${err.message}`, "error");
+      return "";
+    }
   };
 
   const toggleAgentStatus = (agentId: string) => {
@@ -559,6 +639,13 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
     });
   };
 
+  const setAgentChats = (agentId: string, messages: ChatMessage[]) => {
+    setChats((prev) => ({
+      ...prev,
+      [agentId]: messages,
+    }));
+  };
+
   const clearChat = (chatId: string) => {
     setChats((prev) => ({
       ...prev,
@@ -612,6 +699,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
         toggleRule,
         deleteRule,
         addChatMessage,
+        setAgentChats,
         triggerToast,
         removeToast,
         addAlert,
@@ -635,6 +723,8 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         embeddedWallets: {
           ethereum: { createOnLogin: "users-without-wallets" },
         },
+        defaultChain: arcTestnet,
+        supportedChains: [arcTestnet],
       }}
     >
       <AppContextInnerProvider>
