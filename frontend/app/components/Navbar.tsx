@@ -1,10 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
 import { useApp } from "../context/AppContext";
-import { Search, Bell, Wallet, LogOut, ChevronDown, Check, User } from "lucide-react";
+import { Search, Bell, LogOut, ChevronDown, Check, User } from "lucide-react";
 
 export default function Navbar() {
+  const router = useRouter();
+  const { logout } = usePrivy();
   const {
     connectedWallet,
     connectWallet,
@@ -58,10 +62,10 @@ export default function Navbar() {
     <header className="h-18 border-b border-[#22252F] bg-[#090A0F]/85 backdrop-blur-md px-6 flex items-center justify-between shrink-0 select-none z-30">
       
       {/* Token Ticker - Hidden on smaller screens */}
-      <div className="hidden lg:flex items-center gap-6 overflow-hidden max-w-[55%]">
-        <div className="flex items-center gap-5 text-xs font-medium">
-          {tickerItems.map((token) => (
-            <div key={token.symbol} className="flex items-center gap-2 bg-[#15161C] py-1.5 px-3 rounded-lg border border-[#22252F]">
+      <div className="hidden lg:flex items-center overflow-hidden max-w-[55%] ticker-wrap select-none">
+        <div className="flex items-center gap-8 text-xs font-medium ticker-content">
+          {[...tickerItems, ...tickerItems].map((token, index) => (
+            <div key={`${token.symbol}-${index}`} className="inline-flex items-center gap-2 shrink-0 mr-12 select-none">
               <span className="text-slate-400 font-bold">{token.symbol}</span>
               <span className="text-slate-100 font-mono">{token.price}</span>
               <span className={`font-mono text-[10px] ${token.isPositive ? "text-emerald-400" : "text-rose-400"}`}>
@@ -128,35 +132,32 @@ export default function Navbar() {
                     <div className="px-3 py-2 text-xs text-slate-300 font-mono flex flex-col gap-0.5">
                       <span className="text-[10px] text-slate-400">Balance</span>
                       <span className="font-bold text-white text-sm">{connectedWallet.balanceUSDC.toLocaleString()} USDC</span>
-                      <span className="text-slate-400">{connectedWallet.balanceARC.toLocaleString()} ARC</span>
                     </div>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
+                        await logout();
                         disconnectWallet();
                         setDropdownOpen(false);
+                        router.push("/onboarding");
                       }}
                       className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-950/20 hover:text-rose-300 rounded-lg transition-colors cursor-pointer text-left w-full mt-1.5"
                     >
                       <LogOut className="w-4 h-4 shrink-0" />
-                      Disconnect Wallet
+                      Logout Workspace
                     </button>
                   </div>
                 </div>
               </>
             )}
           </div>
-        ) : (
-          <button
-            onClick={() => connectWallet()}
-            className="h-9.5 px-4.5 rounded-xl bg-neon-blue text-slate-950 font-bold text-xs flex items-center gap-2 cursor-pointer hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all"
-          >
-            <Wallet className="w-4 h-4 shrink-0" />
-            Connect Wallet
-          </button>
-        )}
+        ) : null}
 
         {/* Profile Avatar */}
-        <div className="w-9.5 h-9.5 rounded-xl border border-[#22252F] bg-[#090A0F] overflow-hidden flex items-center justify-center text-slate-400">
+        <button
+          onClick={() => router.push("/settings")}
+          className="w-9.5 h-9.5 rounded-xl border border-[#22252F] bg-[#090A0F] overflow-hidden flex items-center justify-center text-slate-400 hover:border-neon-blue/50 hover:bg-[#15161C] transition-all cursor-pointer"
+          title="User Settings"
+        >
           {connectedWallet ? (
             <img
               src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
@@ -166,7 +167,7 @@ export default function Navbar() {
           ) : (
             <User className="w-5 h-5" />
           )}
-        </div>
+        </button>
       </div>
     </header>
   );

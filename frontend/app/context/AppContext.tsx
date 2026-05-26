@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { PrivyProvider, usePrivy, useWallets } from "@privy-io/react-auth";
 
 // Types
 export interface Wallet {
@@ -248,9 +249,95 @@ const INITIAL_ACTIVITY: Activity[] = [
   },
 ];
 
-export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
   const [explorerWallet, setExplorerWallet] = useState<string>("0x71C7656EC7ab88b098defB751B7401B5f6d8976F");
+  const { user: privyUser, authenticated } = usePrivy();
+  const { wallets } = useWallets();
+
+  // Automatically sync your real Privy EVM wallet address and balances into the frontend session
+  useEffect(() => {
+    const activeWallet = privyUser?.wallet || wallets?.[0];
+    if (authenticated && activeWallet?.address) {
+      const address = activeWallet.address;
+      setConnectedWallet((prev) => {
+        if (prev && prev.address === address) return prev;
+        return {
+          address,
+          balanceUSDC: 0,
+          balanceARC: 0,
+          connected: true,
+          type: (activeWallet as any).wallet_client_type === "privy" || (activeWallet as any).walletClientType === "privy" || (activeWallet as any).connector_type === "embedded" || (activeWallet as any).connectorType === "embedded" ? "Privy Embedded" : "MetaMask",
+        };
+      });
+      setExplorerWallet(address);
+
+      // Asynchronously fetch live balances from the Arc Testnet RPC node
+      const fetchBalances = async () => {
+        try {
+          // 1. Fetch native gas balance (on Arc L1, native gas is native USDC, scaled to 18 decimals)
+          const nativeRes = await fetch("https://rpc.testnet.arc.network", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "eth_getBalance",
+              params: [address, "latest"],
+              id: 1,
+            }),
+          });
+          const nativeData = await nativeRes.json();
+          let nativeBalance = 0;
+          if (nativeData.result) {
+            const wei = BigInt(nativeData.result);
+            nativeBalance = Number(wei) / 1e18;
+          }
+
+          // 2. Fetch ERC-20 USDC balance (0x3600000000000000000000000000000000000000, 6 decimals)
+          const cleanAddr = address.toLowerCase().replace("0x", "");
+          const dataPayload = `0x70a08231000000000000000000000000${cleanAddr.padStart(64, "0")}`;
+          const erc20Res = await fetch("https://rpc.testnet.arc.network", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              method: "eth_call",
+              params: [
+                {
+                  to: "0x3600000000000000000000000000000000000000",
+                  data: dataPayload,
+                },
+                "latest",
+              ],
+              id: 2,
+            }),
+          });
+          const erc20Data = await erc20Res.json();
+          let erc20Balance = 0;
+          if (erc20Data.result && erc20Data.result !== "0x") {
+            const rawVal = BigInt(erc20Data.result);
+            erc20Balance = Number(rawVal) / 1e6;
+          }
+
+          setConnectedWallet({
+            address,
+            balanceUSDC: nativeBalance || erc20Balance,
+            balanceARC: 0,
+            connected: true,
+            type: (activeWallet as any).wallet_client_type === "privy" || (activeWallet as any).walletClientType === "privy" || (activeWallet as any).connector_type === "embedded" || (activeWallet as any).connectorType === "embedded" ? "Privy Embedded" : "MetaMask",
+          });
+        } catch (err) {
+          console.error("Error fetching live Arc Testnet balances:", err);
+        }
+      };
+
+      fetchBalances();
+    } else if (!authenticated) {
+      setConnectedWallet(null);
+      setExplorerWallet("0x71C7656EC7ab88b098defB751B7401B5f6d8976F");
+    }
+  }, [authenticated, privyUser, wallets]);
+
   const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
   const [rules, setRules] = useState<Record<string, Rule[]>>(INITIAL_RULES);
   const [alerts, setAlerts] = useState<Alert[]>(INITIAL_ALERTS);
@@ -534,6 +621,26 @@ export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     >
       {children}
     </AppContext.Provider>
+  );
+};
+
+export const AppContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID || "your-privy-app-id";
+
+  return (
+    <PrivyProvider
+      appId={privyAppId}
+      config={{
+        loginMethods: ["google", "wallet", "email"],
+        embeddedWallets: {
+          ethereum: { createOnLogin: "users-without-wallets" },
+        },
+      }}
+    >
+      <AppContextInnerProvider>
+        {children}
+      </AppContextInnerProvider>
+    </PrivyProvider>
   );
 };
 

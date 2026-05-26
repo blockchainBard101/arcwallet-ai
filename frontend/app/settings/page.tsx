@@ -1,10 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
 import { useApp } from "../context/AppContext";
-import { User, Wallet, Bell, Shield, Lock, CreditCard, Sparkles, RefreshCw } from "lucide-react";
+import { User, Wallet, Bell, Shield, Lock, CreditCard, Sparkles, RefreshCw, LogOut } from "lucide-react";
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { logout } = usePrivy();
   const { connectedWallet, connectWallet, disconnectWallet, triggerToast } = useApp();
 
   const [username, setUsername] = useState("BlockchainBard");
@@ -106,6 +110,28 @@ export default function SettingsPage() {
               >
                 Save Profile Changes
               </button>
+
+              <div className="mt-6 border-t border-[#22252F] pt-6 flex flex-col gap-3">
+                <span className="text-[10px] font-bold text-rose-500 uppercase tracking-widest font-mono">Danger Zone</span>
+                <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-950/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-white">Log out of Workspace</span>
+                    <span className="text-[10px] text-slate-400">Safely terminate your Privy identity session and linked wallets sync</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await logout();
+                      disconnectWallet();
+                      router.push("/onboarding");
+                    }}
+                    className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-xs font-bold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4 shrink-0" />
+                    Logout Workspace
+                  </button>
+                </div>
+              </div>
             </form>
           )}
 

@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { usePrivy } from "@privy-io/react-auth";
 import { useApp } from "../context/AppContext";
 import {
   Compass,
@@ -12,12 +13,15 @@ import {
   Activity,
   Settings,
   Sparkles,
+  LogOut,
 } from "lucide-react";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { agents } = useApp();
+  const { logout } = usePrivy();
+  const { disconnectWallet } = useApp();
 
   const menuItems = [
     { name: "Explorer Chat", icon: Compass, path: "/chat" },
@@ -74,6 +78,20 @@ export default function Sidebar() {
               </Link>
             );
           })}
+
+          <div className="h-px bg-[#22252F] my-2" />
+
+          <button
+            onClick={async () => {
+              await logout();
+              disconnectWallet();
+              router.push("/onboarding");
+            }}
+            className="flex items-center gap-3.5 px-4.5 py-3 rounded-xl text-sm font-semibold text-rose-400 hover:bg-rose-950/20 hover:text-rose-300 transition-all cursor-pointer w-full text-left"
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            <span>Logout Workspace</span>
+          </button>
         </nav>
       </div>
 

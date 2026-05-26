@@ -7,19 +7,21 @@ import { Send, User, Bot, HelpCircle, LayoutDashboard, Wallet, Compass, Search, 
 
 export default function ChatPage() {
   const router = useRouter();
-  const { chats, addChatMessage, searchWallet, clearChat } = useApp();
+  const { chats, addChatMessage, searchWallet, clearChat, connectedWallet } = useApp();
   const [inputText, setInputText] = useState("");
 
   const thread = chats["public"] || [];
 
+  const userAddress = connectedWallet?.address || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
+
   const recentSearches = [
-    "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    userAddress,
     "0xArcAgent1A2zP1eP5q77ab",
     "Circle Bridge CCTP Pools",
   ];
 
   const suggestedPrompts = [
-    { label: "Analyze default wallet", text: "Analyze wallet 0x71C7656EC7ab88b098defB751B7401B5f6d8976F" },
+    { label: connectedWallet ? "Analyze my wallet" : "Analyze default wallet", text: `Analyze wallet ${userAddress}` },
     { label: "Check bridge data", text: "Show recent high-volume bridges on Arc" },
     { label: "Verify agent wallet", text: "What is the status of agent wallet 0xArcAgent1A2zP1eP5q77ab?" },
   ];
@@ -36,7 +38,7 @@ export default function ChatPage() {
       if (query.includes("0x")) {
         // Extract address
         const match = textToSend.match(/0x[a-fA-F0-9]+/);
-        const address = match ? match[0] : "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
+        const address = match ? match[0] : userAddress;
         
         addChatMessage(
           "public",

@@ -1,0 +1,105 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 👤 User Entity (Linked to Privy Auth Identity)
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  wallets   Wallet[]
+  agents    Agent[]
+  alerts    Alert[]
+
+  @@map("users")
+}
+
+// 💳 Wallets (Supports both Human Signer Wallet and Autonomous Agent Wallet)
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  address   String   @unique
+  type      String   // "human" | "agent"
+  chain     String   @default("arc")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agents    Agent[]  @relation("AgentExecutionWallet")
+
+  @@map("wallets")
+}
+
+// 🤖 Personal AI Agents (Linked to Circle Agent Wallets)
+model Agent {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  walletId      String   @map("wallet_id")
+  name          String
+  status        String   @default("active") // "active" | "paused" | "terminal"
+  configuration Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet        Wallet   @relation("AgentExecutionWallet", fields: [walletId], references: [id], onDelete: Cascade)
+  rules         Rule[]
+  activityLogs  ActivityLog[]
+
+  @@map("agents")
+}
+
+// 📜 Automation Rules (Natural Language parsed triggers)
+model Rule {
+  id               String   @id @default(uuid())
+  agentId          String   @map("agent_id")
+  naturalRuleText  String   @map("natural_rule_text")
+  parsedConditions Json     @map("parsed_conditions")
+  status           String   @default("active") // "active" | "inactive"
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  agent            Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("rules")
+}
+
+// 🔔 Alerts & Notifications (Monitoring criteria)
+model Alert {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String   // "balance" | "volume" | "custom"
+  condition Json
+  status    String   @default("pending") // "pending" | "triggered" | "dismissed"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("alerts")
+}
+
+// 📊 Audit Logs (Comprehensive transaction logs and rule evaluation outcomes)
+model ActivityLog {
+  id         String   @id @default(uuid())
+  agentId    String   @map("agent_id")
+  actionType String   @map("action_type") // "swap" | "transfer" | "rule_trigger" | "error"
+  status     String   // "success" | "failed" | "pending_signature"
+  txHash     String?  @map("tx_hash")
+  payload    Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
