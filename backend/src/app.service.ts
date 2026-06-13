@@ -390,11 +390,23 @@ export class AppService {
       }
     }
 
+    // Calculate a heuristic risk score (0-100, lower is safer)
+    let riskScore = 15;
+    if (transactionCount === 0) {
+      riskScore = 45; // New/unused wallet has unknown/medium risk
+    } else {
+      if (transactionCount < 3) riskScore += 15;
+      if (portfolioValue < 1) riskScore += 10; // low balance
+      if (totalVolumeTraded > 5000 && transactionCount === 1) riskScore += 35; // anomaly: single massive trade
+    }
+    riskScore = Math.min(100, Math.max(0, riskScore));
+
     return {
       portfolioValue,
       totalVolumeTraded,
       transactionCount,
       uniqueDexPools,
+      riskScore,
       heatmap,
       transactions,
       charts: {

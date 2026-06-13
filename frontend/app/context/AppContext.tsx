@@ -4,6 +4,14 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { PrivyProvider, usePrivy, useWallets } from "@privy-io/react-auth";
 import { arcTestnet } from "viem/chains";
 
+export const getBackendUrl = () => {
+  if (typeof window !== "undefined") {
+    return `http://${window.location.hostname}:3001`;
+  }
+  return "http://localhost:3001";
+};
+
+
 // Types
 export interface Wallet {
   address: string;
@@ -377,7 +385,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
           const token = await getAccessToken();
           if (!token) return;
 
-          const res = await fetch("http://localhost:3001/agents", {
+          const res = await fetch(`${getBackendUrl()}/agents`, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -491,7 +499,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
 
       triggerToast(`Provisioning Circle wallet for "${name}"...`, "info");
 
-      const res = await fetch("http://localhost:3001/agents", {
+      const res = await fetch(`${getBackendUrl()}/agents`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

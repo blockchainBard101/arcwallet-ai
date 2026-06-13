@@ -2,17 +2,86 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useApp } from "../context/AppContext";
-import { usePrivy } from "@privy-io/react-auth";
-import { Send, User, Bot, HelpCircle, LayoutDashboard, Wallet, Compass, Search, ExternalLink } from "lucide-react";
+import { useApp, getBackendUrl } from "../context/AppContext";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { Send, User, Bot, HelpCircle, LayoutDashboard, Wallet, Compass, Search, ExternalLink, CreditCard, Copy, Check, Sparkles, ArrowRight } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 export default function ChatPage() {
   const router = useRouter();
-  const { chats, addChatMessage, searchWallet, clearChat, connectedWallet, recentExplorations } = useApp();
+  const { chats, addChatMessage, searchWallet, clearChat, connectedWallet, recentExplorations, triggerToast } = useApp();
   const { getAccessToken } = usePrivy();
+  const { wallets } = useWallets();
   const [inputText, setInputText] = useState("");
   const [isResponding, setIsResponding] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+
+  const handleExecuteRealTransaction = async (preparedPayload: any) => {
+    if (!preparedPayload || !preparedPayload.transaction) {
+      triggerToast("Invalid transaction parameters", "error");
+      return;
+    }
+
+    triggerToast("Initiating secure signature request...", "info");
+
+    try {
+      const activeWallet = wallets?.[0];
+      if (!activeWallet) {
+        triggerToast("No connected wallet found. Please authenticate.", "error");
+        return;
+      }
+
+      const provider = await activeWallet.getEthereumProvider();
+      
+      triggerToast("Requesting cryptographic signature from Privy...", "info");
+      
+      const txParams = preparedPayload.transaction;
+      
+      const { createWalletClient, custom } = await import("viem");
+      const { arcTestnet } = await import("viem/chains");
+      
+      const client = createWalletClient({
+        account: activeWallet.address as `0x${string}`,
+        chain: arcTestnet,
+        transport: custom(provider),
+      });
+
+      const signedTx = await client.signTransaction({
+        to: txParams.to as `0x${string}`,
+        data: txParams.data as `0x${string}`,
+        value: txParams.value ? BigInt(txParams.value) : 0n,
+        nonce: Number(txParams.nonce),
+        gas: txParams.gasLimit ? BigInt(txParams.gasLimit) : 100000n,
+      });
+
+      triggerToast("Transaction signed successfully. Broadcasting...", "info");
+
+      const res = await fetch(`${getBackendUrl()}/transactions/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signedTx }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to broadcast signed transaction.");
+      }
+
+      const result = await res.json();
+      
+      addChatMessage(
+        "public",
+        `✅ Transaction successfully signed & executed!\n\nTx Hash: \`${result.txHash}\`\n\n[View on Explorer](https://testnet.arcscan.app/tx/${result.txHash})`,
+        "agent"
+      );
+
+      triggerToast("Transaction executed successfully!", "success");
+    } catch (err: any) {
+      console.error(err);
+      triggerToast(`Execution failed: ${err.message || err}`, "error");
+    }
+  };
 
   const thread = chats["public"] || [];
 
@@ -35,7 +104,7 @@ export default function ChatPage() {
 
     try {
       const token = await getAccessToken();
-      const res = await fetch("http://localhost:3001/chat", {
+      const res = await fetch(`${getBackendUrl()}/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -59,28 +128,63 @@ export default function ChatPage() {
         setSessionId(data.sessionId);
       }
 
-      // Generate structured card if get_public_wallet_stats was run
+      // Generate structured card from response actions or tools
       let customData: any = null;
-      const ranStatsTool = data.toolsUsed?.includes("get_public_wallet_stats");
-      const matchedAddr = textToSend.match(/0x[a-fA-F0-9]+/);
-      const address = matchedAddr ? matchedAddr[0] : null;
+      const actions = data.structuredData?.actions ?? [];
+      const txAction = actions.find((a: any) => a.type === 'sign_transaction');
+      const fundAction = actions.find((a: any) => a.type === 'fund_agent');
 
-      if (ranStatsTool && address) {
-        try {
-          const statsRes = await fetch(`http://localhost:3001/stats/${address}?timezone=${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
-          const stats = statsRes.ok ? await statsRes.json() : null;
-          if (stats) {
-            customData = {
-              type: "wallet_preview",
-              address: address,
-              balance: `${stats.portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`,
-              tokens: ["USDC", "ARC", "USDT"],
-              txCount: stats.transactionCount,
-              riskScore: 8,
-            };
+      if (txAction?.payload) {
+        const p = txAction.payload;
+        const activeWallet = wallets?.[0];
+        const fromAddr = p.transaction?.from || activeWallet?.address || "Connected Wallet";
+        const toAddr = p.recipientAddress || p.transaction?.to || "—";
+        const amountStr = p.amount ? `${p.amount} USDC` : "—";
+
+        customData = {
+          type: "transaction_preview",
+          title: "Sign Transaction via Privy",
+          details: [
+            { label: "From Address", value: fromAddr.startsWith("0x") ? `${fromAddr.slice(0, 10)}...${fromAddr.slice(-6)}` : fromAddr },
+            { label: "To Address",   value: toAddr.startsWith("0x") ? `${toAddr.slice(0, 10)}...${toAddr.slice(-6)}` : toAddr },
+            { label: "Amount",       value: amountStr },
+            { label: "Safety Score", value: `${p.risk?.score ?? 100}/100` },
+          ],
+          showExecuteButton: true,
+          warning: p.risk?.warnings?.join(" | ") || p.warning || null,
+          payload: p,
+        };
+      } else if (fundAction?.payload) {
+        const p = fundAction.payload;
+        customData = {
+          type: "fund_agent",
+          title: `Fund ${p.agentName}`,
+          depositAddress: p.depositAddress,
+          requestedAmount: p.requestedAmount,
+          agentId: p.agentId,
+        };
+      } else {
+        const ranStatsTool = data.toolsUsed?.includes("get_public_wallet_stats");
+        const matchedAddr = textToSend.match(/0x[a-fA-F0-9]+/);
+        const address = matchedAddr ? matchedAddr[0] : null;
+
+        if (ranStatsTool && address) {
+          try {
+            const statsRes = await fetch(`${getBackendUrl()}/stats/${address}?timezone=${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+            const stats = statsRes.ok ? await statsRes.json() : null;
+            if (stats) {
+              customData = {
+                type: "wallet_preview",
+                address: address,
+                balance: `${stats.portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`,
+                tokens: ["USDC", "ARC", "USDT"],
+                txCount: stats.transactionCount,
+                riskScore: stats.riskScore ?? 15,
+              };
+            }
+          } catch (e) {
+            console.error("Failed to load inline preview stats:", e);
           }
-        } catch (e) {
-          console.error("Failed to load inline preview stats:", e);
         }
       }
 
@@ -171,7 +275,39 @@ export default function ChatPage() {
                 <div className={`p-4 rounded-2xl text-xs leading-relaxed ${
                   msg.sender === "user" ? "bg-neon-blue/10 text-slate-200 rounded-tr-none" : "bg-[#090A0F]/60 text-slate-300 border border-[#22252F] rounded-tl-none"
                 }`}>
-                  {msg.text}
+                  {msg.sender === "user" ? (
+                    <span>{msg.text}</span>
+                  ) : (
+                    <div className="prose-agent">
+                      <ReactMarkdown
+                        components={{
+                          h1: ({ children }) => <h1 className="text-sm font-bold text-white mb-2 mt-1">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-xs font-bold text-white mb-1.5 mt-2">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-xs font-semibold text-slate-200 mb-1 mt-1.5">{children}</h3>,
+                          p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                          strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+                          em: ({ children }) => <em className="text-slate-300 italic">{children}</em>,
+                          code: ({ children, className }) => {
+                            const isBlock = className?.includes("language-");
+                            return isBlock ? (
+                              <code className="block bg-[#0a0b10] border border-[#22252F] rounded-lg p-2.5 font-mono text-[9px] text-neon-cyan overflow-x-auto my-2 whitespace-pre">{children}</code>
+                            ) : (
+                              <code className="bg-[#0a0b10] border border-[#22252F] rounded px-1.5 py-0.5 font-mono text-[9px] text-neon-cyan">{children}</code>
+                            );
+                          },
+                          pre: ({ children }) => <pre className="my-0">{children}</pre>,
+                          ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5 text-slate-300">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5 text-slate-300">{children}</ol>,
+                          li: ({ children }) => <li className="text-xs">{children}</li>,
+                          hr: () => <hr className="border-[#22252F] my-2" />,
+                          a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" className="text-neon-blue underline hover:text-neon-cyan transition-colors">{children}</a>,
+                          blockquote: ({ children }) => <blockquote className="border-l-2 border-neon-blue/30 pl-3 italic text-slate-400 my-1">{children}</blockquote>,
+                        }}
+                      >
+                        {msg.text}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
 
                 {/* Inline previews */}
@@ -189,8 +325,16 @@ export default function ChatPage() {
                       <span className="text-slate-400 font-mono">Transactions: {msg.data.txCount}</span>
                       <div className="flex items-center gap-1.5 mt-1">
                         <span className="text-slate-400">Risk Score:</span>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/20 text-emerald-400 border border-emerald-500/20">
-                          {msg.data.riskScore}/100 (Safe)
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                          msg.data.riskScore < 30
+                            ? "bg-emerald-950/20 text-emerald-400 border-emerald-500/20"
+                            : msg.data.riskScore < 60
+                            ? "bg-amber-950/20 text-amber-400 border-amber-500/20"
+                            : "bg-rose-950/20 text-rose-400 border-rose-500/20"
+                        }`}>
+                          {msg.data.riskScore}/100 ({
+                            msg.data.riskScore < 30 ? "Safe" : msg.data.riskScore < 60 ? "Medium Risk" : "High Risk"
+                          })
                         </span>
                       </div>
                     </div>
@@ -216,6 +360,119 @@ export default function ChatPage() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {msg.data && msg.data.type === "transaction_preview" && (
+                  <div className="glass-panel p-4 border-[#22252F] bg-[#090A0F]/70 max-w-sm flex flex-col gap-3 animate-slide-in">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-neon-cyan" />
+                      {msg.data.title}
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {msg.data.details?.map((detail: any, idx: number) => (
+                        <div key={idx} className="flex flex-col gap-0.5 border-r border-[#22252F] last:border-0 pr-2">
+                          <span className="text-[8px] text-slate-500 font-bold uppercase">{detail.label}</span>
+                          <span className="text-[10px] text-white font-mono font-semibold">{detail.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {msg.data.warning && (
+                      <div className="text-[9px] text-amber-500 font-medium bg-amber-950/20 border border-amber-500/25 p-2 rounded-lg leading-normal">
+                        ⚠️ {msg.data.warning}
+                      </div>
+                    )}
+                    {msg.data.showExecuteButton && (
+                      <button
+                        onClick={() => handleExecuteRealTransaction(msg.data.payload)}
+                        type="button"
+                        className="w-full py-2 rounded-lg bg-neon-blue text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        Sign & Execute Tx
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {msg.data && msg.data.type === "fund_agent" && (
+                  <div className="glass-panel p-4 border-[#22252F] bg-[#090A0F]/70 max-w-sm flex flex-col gap-3 animate-slide-in">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                      <CreditCard className="w-3.5 h-3.5 text-neon-blue" />
+                      {msg.data.title}
+                    </span>
+                    <div className="flex flex-col gap-1 text-[11px]">
+                      <span className="text-[8px] text-slate-500 font-bold uppercase">Deposit Address</span>
+                      <div className="flex items-center gap-2 bg-[#090A0F] rounded-lg px-2.5 py-2 border border-[#22252F]">
+                        <span className="text-[9px] font-mono text-slate-300 truncate flex-1">{msg.data.depositAddress}</span>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(msg.data.depositAddress); triggerToast("Address copied!", "info"); }}
+                          className="text-slate-500 hover:text-neon-cyan transition-colors cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    {msg.data.requestedAmount && (
+                      <div className="text-[10px] text-slate-400">
+                        Amount Requested: <span className="text-white font-bold">{msg.data.requestedAmount} USDC</span>
+                      </div>
+                    )}
+                    <button
+                      onClick={async () => {
+                        try {
+                          const activeWallet = wallets?.[0];
+                          if (!activeWallet) {
+                            triggerToast("No wallet connected.", "error");
+                            return;
+                          }
+                          const provider = await activeWallet.getEthereumProvider();
+                          const { createWalletClient, custom, parseUnits } = await import("viem");
+                          const { arcTestnet } = await import("viem/chains");
+                          const client = createWalletClient({
+                            account: activeWallet.address as `0x${string}`,
+                            chain: arcTestnet,
+                            transport: custom(provider),
+                          });
+                          
+                          const USDC_CONTRACT = "0x3600000000000000000000000000000000000000" as `0x${string}`;
+                          const transferAbi = [{
+                            name: "transfer",
+                            type: "function",
+                            stateMutability: "nonpayable",
+                            inputs: [
+                              { name: "to",     type: "address" },
+                              { name: "amount", type: "uint256" },
+                            ],
+                            outputs: [{ type: "bool" }],
+                          }] as const;
+                          
+                          const amountRaw = parseUnits(String(msg.data.requestedAmount || 10), 6);
+                          const { encodeFunctionData } = await import("viem");
+                          const calldata = encodeFunctionData({
+                            abi: transferAbi,
+                            functionName: "transfer",
+                            args: [msg.data.depositAddress as `0x${string}`, amountRaw],
+                          });
+                          
+                          triggerToast("Sending transaction...", "info");
+                          const hash = await client.sendTransaction({
+                            to: USDC_CONTRACT,
+                            data: calldata,
+                          });
+                          
+                          addChatMessage("public", `✅ Successfully sent ${msg.data.requestedAmount || 10} USDC to agent vault!\n\nTx Hash: \`${hash}\``, "agent");
+                          triggerToast("Funds sent successfully!", "success");
+                        } catch (err: any) {
+                          console.error(err);
+                          triggerToast(`Transfer failed: ${err.message || err}`, "error");
+                        }
+                      }}
+                      className="w-full py-2 rounded-lg bg-neon-blue text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      Fund Vault Now
+                    </button>
                   </div>
                 )}
               </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useApp } from "../context/AppContext";
+import { useApp, getBackendUrl } from "../context/AppContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { Wallet, ArrowLeft, Loader2, Sparkles, ShieldCheck, CheckCircle2 } from "lucide-react";
 
@@ -28,7 +28,7 @@ export default function OnboardingPage() {
           const token = await getAccessToken();
           if (token) {
             // Dispatch to NestJS backend silently
-            const response = await fetch("http://localhost:3001/auth-test", {
+            const response = await fetch(`${getBackendUrl()}/auth-test`, {
               method: "GET",
               headers: {
                 "Authorization": `Bearer ${token.trim()}`,

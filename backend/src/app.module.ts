@@ -6,9 +6,11 @@ import { AuthModule } from './auth/auth.module';
 import { CircleModule } from './circle/circle.module';
 import { AgentModule } from './agent/agent.module';
 import { LlmModule } from './llm/llm.module';
+import { RiskModule } from './risk/risk.module';
+import { TransactionModule } from './transaction/transaction.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, CircleModule, AgentModule, LlmModule],
+  imports: [PrismaModule, AuthModule, CircleModule, AgentModule, LlmModule, RiskModule, TransactionModule],
   controllers: [AppController],
   providers: [AppService],
 })

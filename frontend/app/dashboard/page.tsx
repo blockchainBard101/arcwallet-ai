@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useApp } from "../context/AppContext";
+import { useApp, getBackendUrl } from "../context/AppContext";
 import MetricCard from "../components/MetricCard";
 import { VolumeTrendChart, DexDistributionChart, BridgeBarChart } from "../components/CustomCharts";
 import ActivityHeatmap from "../components/ActivityHeatmap";
@@ -44,7 +44,7 @@ export default function DashboardPage() {
       setLoading(true);
       try {
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const res = await fetch(`http://localhost:3001/stats/${explorerWallet}?timeframe=${timeframe}&timezone=${timeZone}`);
+        const res = await fetch(`${getBackendUrl()}/stats/${explorerWallet}?timeframe=${timeframe}&timezone=${timeZone}`);
         if (!res.ok) throw new Error("Failed to fetch stats");
         const data = await res.json();
         if (active) {

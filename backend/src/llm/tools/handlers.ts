@@ -1,11 +1,13 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { CircleService } from '../../circle/circle.service';
 import { AppService } from '../../app.service';
+import { TransactionService } from '../../transaction/transaction.service';
 
 export interface ToolContext {
   userId: string;
   prisma: PrismaService;
   circle: CircleService;
+  transactionService: TransactionService;
 }
 
 /**
@@ -43,6 +45,16 @@ export async function executeTool(
       );
     case 'get_public_wallet_stats':
       return handleGetPublicWalletStats(toolInput as { address: string }, ctx);
+    case 'bridge_usdc':
+      return handleBridgeUsdc(
+        toolInput as {
+          fromAgentId: string;
+          destinationChain: string;
+          recipientAddress: string;
+          amountUsdc: number;
+        },
+        ctx,
+      );
     default:
       return JSON.stringify({ error: `Unknown tool: ${toolName}` });
   }
@@ -150,28 +162,17 @@ async function handlePrepareTransaction(
   input: { fromAgentId: string; toAddress: string; amountUsdc: number },
   ctx: ToolContext,
 ): Promise<string> {
-  const agent = await ctx.prisma.agent.findFirst({
-    where: { id: input.fromAgentId, userId: ctx.userId },
-    include: { wallet: true },
-  });
-  if (!agent) return JSON.stringify({ error: 'Source agent not found.' });
-
-  // Build a preview payload — no on-chain action yet
-  const preview = {
-    status: 'PENDING_SIGNATURE',
-    fromAddress: agent.wallet.address,
-    toAddress: input.toAddress,
-    amountUsdc: input.amountUsdc,
-    chain: 'arc-testnet',
-    estimatedGas: '~0.0031 ARC',
-    warning:
-      input.amountUsdc >= 50
-        ? 'This transfer is $50 USDC or more. Please review carefully before signing.'
-        : null,
-    instruction: 'Return this payload to the frontend for Privy signature confirmation.',
-  };
-
-  return JSON.stringify(preview);
+  try {
+    const result = await ctx.transactionService.prepareTransaction(
+      ctx.userId,
+      input.fromAgentId,
+      input.toAddress,
+      input.amountUsdc,
+    );
+    return JSON.stringify(result);
+  } catch (err: any) {
+    return JSON.stringify({ error: err.message ?? 'Failed to prepare transaction' });
+  }
 }
 
 async function handleFundAgent(
@@ -288,6 +289,99 @@ async function handleGetPublicWalletStats(
     return JSON.stringify(stats);
   } catch (err) {
     return JSON.stringify({ error: `Failed to fetch stats for wallet: ${err.message}` });
+  }
+}
+
+async function handleBridgeUsdc(
+  input: {
+    fromAgentId: string;
+    destinationChain: string;
+    recipientAddress: string;
+    amountUsdc: number;
+  },
+  ctx: ToolContext,
+): Promise<string> {
+  const agent = await ctx.prisma.agent.findFirst({
+    where: { id: input.fromAgentId, userId: ctx.userId },
+    include: { wallet: true },
+  });
+  if (!agent) return JSON.stringify({ error: 'Source agent not found.' });
+
+  // Map chain string to CCTP Chain name
+  const chainMapping: Record<string, string> = {
+    solana: 'Solana_Devnet',
+    base: 'Base_Sepolia',
+    sui: 'Sui_Testnet',
+    ethereum: 'Ethereum_Sepolia',
+    arbitrum: 'Arbitrum_Sepolia',
+    arc: 'Arc_Testnet',
+  };
+
+  const destChainKey = input.destinationChain.toLowerCase();
+  const destChain = chainMapping[destChainKey];
+  if (!destChain) {
+    return JSON.stringify({
+      error: `Unsupported destination chain: ${input.destinationChain}. Supported chains are: Solana, Base, Sui, Ethereum, Arbitrum, Arc.`,
+    });
+  }
+
+  const apiKey = process.env.CIRCLE_API_KEY;
+  const entitySecret = process.env.ENTITY_SECRET;
+
+  if (!apiKey || !entitySecret) {
+    return JSON.stringify({ error: 'Circle API configuration missing on the server.' });
+  }
+
+  try {
+    const { AppKit } = await import('@circle-fin/app-kit');
+    const { createCircleWalletsAdapter } = await import('@circle-fin/adapter-circle-wallets');
+
+    const kit = new AppKit();
+    const adapter = createCircleWalletsAdapter({
+      apiKey,
+      entitySecret,
+    });
+
+    const result = await kit.bridge({
+      from: {
+        adapter,
+        chain: 'Arc_Testnet',
+        address: agent.wallet.address,
+      },
+      to: {
+        recipientAddress: input.recipientAddress,
+        chain: destChain as any,
+        useForwarder: true,
+      },
+      amount: input.amountUsdc.toFixed(2),
+    });
+
+    await ctx.prisma.activityLog.create({
+      data: {
+        agentId: agent.id,
+        actionType: 'transfer',
+        status: result.state,
+        txHash: result.steps?.find((s: any) => s.name === 'burn')?.txHash || null,
+        payload: JSON.parse(JSON.stringify({
+          to: input.recipientAddress,
+          amountUsdc: input.amountUsdc,
+          destinationChain: destChain,
+          bridgeResult: result,
+        })),
+      },
+    });
+
+    return JSON.stringify({
+      success: true,
+      state: result.state,
+      steps: result.steps,
+      message: `USDC bridge initiated successfully from ${agent.name} to ${input.destinationChain}. Status: ${result.state}`,
+    });
+  } catch (err: any) {
+    return JSON.stringify({
+      success: false,
+      error: err.message ?? 'Cross-chain bridge transfer failed.',
+    });
   }
 }
 

@@ -85,7 +85,7 @@ export const CORE_TOOLS: Anthropic.Tool[] = [
           description: 'Amount of USDC to transfer.',
         },
       },
-      required: ['fromAgentId', 'toAddress', 'amountUsdc'],
+      required: ['toAddress', 'amountUsdc'],
     },
   },
   {
@@ -151,6 +151,33 @@ export const CORE_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ['address'],
+    },
+  },
+  {
+    name: 'bridge_usdc',
+    description:
+      'Bridge USDC tokens from an agent\'s vault to another chain (such as Solana, Base, Ethereum, Arbitrum, or Sui) using CCTP. Use when the user asks to bridge, move cross-chain, or send USDC from an agent to another chain.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        fromAgentId: {
+          type: 'string',
+          description: 'The database ID of the sending agent.',
+        },
+        destinationChain: {
+          type: 'string',
+          description: 'The chain to bridge USDC to (e.g., "Solana", "Base", "Sui", "Ethereum", "Arbitrum").',
+        },
+        recipientAddress: {
+          type: 'string',
+          description: 'The recipient address on the destination chain (e.g. 0x... or Solana public key).',
+        },
+        amountUsdc: {
+          type: 'number',
+          description: 'Amount of USDC to bridge.',
+        },
+      },
+      required: ['fromAgentId', 'destinationChain', 'recipientAddress', 'amountUsdc'],
     },
   },
 ];

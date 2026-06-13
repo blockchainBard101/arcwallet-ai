@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CircleService } from '../circle/circle.service';
 import { CORE_TOOLS } from './tools/registry';
 import { executeTool } from './tools/handlers';
+import { TransactionService } from '../transaction/transaction.service';
 
 // ──────────────────────────────────────────────────────────
 // Provider config resolved from agent.configuration in DB
@@ -49,7 +50,8 @@ You are currently acting as the agent named "${agentName}" (ID: ${agentId}).
 When the user refers to "my balance", "my wallet", "this agent", or asks anything without specifying another agent,
 ALWAYS default to agentId "${agentId}". Do NOT call list_agents for single-agent questions.` : `
 ## Current Agent Context
-You are currently acting as the Public Explorer Agent (${agentName}). You can query public wallet statistics and help the user explore the Arc blockchain.`;
+You are currently acting as the Public Explorer Agent (${agentName}). You can query public wallet statistics and help the user explore the Arc blockchain.
+CRITICAL: As the Public Explorer Agent, you do not have an agent wallet vault. Therefore, you CANNOT execute transactions autonomously. If the user asks to send, transfer, or move USDC, you MUST call 'prepare_transaction' so the user can sign and execute it from their own primary (Privy) wallet on the frontend. Never attempt to call 'execute_transaction'.`;
   return `${BASE_SYSTEM_PROMPT}
 ${agentContext}`;
 }
@@ -75,6 +77,7 @@ export class LlmService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly circle: CircleService,
+    private readonly transactionService: TransactionService,
   ) {}
 
   // ──────────────────────────────────────────────────────────
@@ -227,7 +230,7 @@ export class LlmService {
           const result = await executeTool(
             tool.name,
             tool.input as Record<string, any>,
-            { userId, prisma: this.prisma, circle: this.circle },
+            { userId, prisma: this.prisma, circle: this.circle, transactionService: this.transactionService },
           );
           this.enrichStructuredData(tool.name, result, structuredData);
           toolResults.push({ type: 'tool_result', tool_use_id: tool.id, content: result });
@@ -312,6 +315,7 @@ export class LlmService {
             userId,
             prisma: this.prisma,
             circle: this.circle,
+            transactionService: this.transactionService,
           });
           this.enrichStructuredData(name, result, structuredData);
 

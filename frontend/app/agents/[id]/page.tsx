@@ -2,10 +2,10 @@
 
 import React, { use, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { usePrivy, useSendTransaction } from "@privy-io/react-auth";
+import { usePrivy, useSendTransaction, useWallets } from "@privy-io/react-auth";
 import { encodeFunctionData } from "viem";
 import ReactMarkdown from "react-markdown";
-import { useApp } from "../../context/AppContext";
+import { useApp, getBackendUrl } from "../../context/AppContext";
 import {
   Bot,
   User,
@@ -47,6 +47,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
   } = useApp();
 
   const { getAccessToken, authenticated, ready } = usePrivy();
+  const { wallets } = useWallets();
   const { sendTransaction } = useSendTransaction();
 
   // Arc testnet USDC constants
@@ -154,7 +155,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
         if (!token) return;
 
         // 1. Fetch sessions
-        const sessionsRes = await fetch("http://localhost:3001/chat/sessions", {
+        const sessionsRes = await fetch(`${getBackendUrl()}/chat/sessions`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!sessionsRes.ok) return;
@@ -165,7 +166,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
           setSessionId(activeSession.id);
 
           // 2. Fetch messages
-          const msgRes = await fetch(`http://localhost:3001/chat/sessions/${activeSession.id}/messages`, {
+          const msgRes = await fetch(`${getBackendUrl()}/chat/sessions/${activeSession.id}/messages`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (msgRes.ok) {
@@ -302,7 +303,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
     try {
       const token = await getAccessToken();
-      const res = await fetch("http://localhost:3001/chat", {
+      const res = await fetch(`${getBackendUrl()}/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -334,17 +335,23 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
       if (txAction?.payload) {
         const p = txAction.payload;
+        const activeWallet = wallets?.[0];
+        const fromAddr = p.transaction?.from || activeWallet?.address || "Connected Wallet";
+        const toAddr = p.recipientAddress || p.transaction?.to || "—";
+        const amountStr = p.amount ? `${p.amount} USDC` : "—";
+
         customData = {
           type: "transaction_preview",
-          title: "Transaction Preview",
+          title: "Sign Transaction via Privy",
           details: [
-            { label: "From",     value: `${p.fromAddress?.slice(0, 14)}...` },
-            { label: "To",       value: `${p.toAddress?.slice(0, 14)}...` },
-            { label: "Amount",   value: `${p.amountUsdc} USDC` },
-            { label: "Est. Gas", value: p.estimatedGas ?? "—" },
+            { label: "From Address", value: fromAddr.startsWith("0x") ? `${fromAddr.slice(0, 10)}...${fromAddr.slice(-6)}` : fromAddr },
+            { label: "To Address",   value: toAddr.startsWith("0x") ? `${toAddr.slice(0, 10)}...${toAddr.slice(-6)}` : toAddr },
+            { label: "Amount",       value: amountStr },
+            { label: "Safety Score", value: `${p.risk?.score ?? 100}/100` },
           ],
-          showExecuteButton: false,
-          warning: p.warning,
+          showExecuteButton: true,
+          warning: p.risk?.warnings?.join(" | ") || p.warning || null,
+          payload: p,
         };
       } else if (fundAction?.payload) {
         const p = fundAction.payload;
@@ -405,6 +412,82 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
       addChatMessage(id, "⚠️ Connection error — is the backend running on port 3001?", "agent");
     } finally {
       setIsThinking(false);
+    }
+  };
+
+  const handleExecuteRealTransaction = async (preparedPayload: any) => {
+    if (!preparedPayload || !preparedPayload.transaction) {
+      triggerToast("Invalid transaction parameters", "error");
+      return;
+    }
+
+    triggerToast("Initiating secure signature request...", "info");
+
+    try {
+      const activeWallet = wallets?.[0];
+      if (!activeWallet) {
+        triggerToast("No connected wallet found. Please authenticate.", "error");
+        return;
+      }
+
+      const provider = await activeWallet.getEthereumProvider();
+      
+      triggerToast("Requesting cryptographic signature from Privy...", "info");
+      
+      const txParams = preparedPayload.transaction;
+      
+      const { createWalletClient, custom } = await import("viem");
+      const { arcTestnet } = await import("viem/chains");
+      
+      const client = createWalletClient({
+        account: activeWallet.address as `0x${string}`,
+        chain: arcTestnet,
+        transport: custom(provider),
+      });
+
+      const signedTx = await client.signTransaction({
+        to: txParams.to as `0x${string}`,
+        data: txParams.data as `0x${string}`,
+        value: txParams.value ? BigInt(txParams.value) : 0n,
+        nonce: Number(txParams.nonce),
+        gas: txParams.gasLimit ? BigInt(txParams.gasLimit) : 100000n,
+      });
+
+      triggerToast("Transaction signed successfully. Broadcasting...", "info");
+
+      const res = await fetch(`${getBackendUrl()}/transactions/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signedTx }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to broadcast signed transaction.");
+      }
+
+      const result = await res.json();
+      
+      addChatMessage(
+        id,
+        `✅ Transaction successfully signed & executed!\n\nTx Hash: \`${result.txHash}\`\n\n[View on Explorer](https://testnet.arcscan.app/tx/${result.txHash})`,
+        "agent"
+      );
+
+      setLogs((prev) => [
+        ...prev,
+        `[TRANSACTION] [${new Date().toLocaleTimeString()}] Securely signed by Privy user.`,
+        `[TRANSACTION] [${new Date().toLocaleTimeString()}] Broadcast completed. Tx: ${result.txHash.slice(0, 10)}...`,
+      ]);
+
+      triggerToast("Transaction executed successfully!", "success");
+    } catch (err: any) {
+      console.error(err);
+      triggerToast(`Execution failed: ${err.message || err}`, "error");
+      setLogs((prev) => [
+        ...prev,
+        `[ERROR] [${new Date().toLocaleTimeString()}] Transaction signing or execution rejected/failed.`,
+      ]);
     }
   };
 
@@ -593,11 +676,17 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
                             </div>
                             {msg.data.showExecuteButton && (
                               <button
-                                onClick={() => handleExecuteSimulatedAction(msg.data.title)}
+                                onClick={() => {
+                                  if (msg.data.type === "transaction_preview") {
+                                    handleExecuteRealTransaction(msg.data.payload);
+                                  } else {
+                                    handleExecuteSimulatedAction(msg.data.title);
+                                  }
+                                }}
                                 type="button"
                                 className="mt-1 h-7 rounded-lg bg-neon-blue text-slate-950 font-bold text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all"
                               >
-                                Execute Sandboxed Tx
+                                {msg.data.type === "transaction_preview" ? "Sign & Execute Tx" : "Execute Sandboxed Tx"}
                                 <ArrowRight className="w-3 h-3" />
                               </button>
                             )}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApp } from "./context/AppContext";
 import { Bot, ArrowRight, ShieldCheck, Compass, BarChart3, Coins, Sparkles, Send, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -165,7 +166,39 @@ export default function LandingPage() {
                   <div className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
                     msg.sender === "user" ? "bg-neon-blue/10 text-slate-200 rounded-tr-none" : "bg-[#090A0F]/50 text-slate-300 rounded-tl-none border border-[#22252F]"
                   }`}>
-                    {msg.text}
+                    {msg.sender === "user" ? (
+                      <span>{msg.text}</span>
+                    ) : (
+                      <div className="prose-agent">
+                        <ReactMarkdown
+                          components={{
+                            h1: ({ children }) => <h1 className="text-sm font-bold text-white mb-2 mt-1">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-xs font-bold text-white mb-1.5 mt-2">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-xs font-semibold text-slate-200 mb-1 mt-1.5">{children}</h3>,
+                            p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                            strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+                            em: ({ children }) => <em className="text-slate-300 italic">{children}</em>,
+                            code: ({ children, className }) => {
+                              const isBlock = className?.includes("language-");
+                              return isBlock ? (
+                                <code className="block bg-[#0a0b10] border border-[#22252F] rounded-lg p-2.5 font-mono text-[9px] text-neon-cyan overflow-x-auto my-2 whitespace-pre">{children}</code>
+                              ) : (
+                                <code className="bg-[#0a0b10] border border-[#22252F] rounded px-1.5 py-0.5 font-mono text-[9px] text-neon-cyan">{children}</code>
+                              );
+                            },
+                            pre: ({ children }) => <pre className="my-0">{children}</pre>,
+                            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5 text-slate-300">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5 text-slate-300">{children}</ol>,
+                            li: ({ children }) => <li className="text-xs">{children}</li>,
+                            hr: () => <hr className="border-[#22252F] my-2" />,
+                            a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" className="text-neon-blue underline hover:text-neon-cyan transition-colors">{children}</a>,
+                            blockquote: ({ children }) => <blockquote className="border-l-2 border-neon-blue/30 pl-3 italic text-slate-400 my-1">{children}</blockquote>,
+                          }}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                   </div>
 
                   {/* Simulated widget render */}
