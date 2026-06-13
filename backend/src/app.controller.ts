@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { AppService } from './app.service';
 import { AuthGuard } from './auth/auth.guard';
 
@@ -11,6 +11,16 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  @Get('stats/:address')
+  async getStats(
+    @Param('address') address: string,
+    @Query('timeframe') timeframe?: string,
+    @Query('timezone') timezone?: string,
+  ) {
+    return this.appService.getWalletStats(address, timeframe, timezone);
+  }
+
+
   @Get('auth-test')
   @UseGuards(AuthGuard)
   testAuth(@Req() req: any) {
@@ -21,3 +31,4 @@ export class AppController {
     };
   }
 }
+

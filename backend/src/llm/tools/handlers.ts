@@ -1,5 +1,6 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { CircleService } from '../../circle/circle.service';
+import { AppService } from '../../app.service';
 
 export interface ToolContext {
   userId: string;
@@ -40,10 +41,13 @@ export async function executeTool(
         toolInput as { agentId?: string; agentName?: string; amountUsdc?: number },
         ctx,
       );
+    case 'get_public_wallet_stats':
+      return handleGetPublicWalletStats(toolInput as { address: string }, ctx);
     default:
       return JSON.stringify({ error: `Unknown tool: ${toolName}` });
   }
 }
+
 
 // ─────────────────────────────────────────────
 // Tool Implementations
@@ -273,3 +277,17 @@ async function handleExecuteTransaction(
     });
   }
 }
+
+async function handleGetPublicWalletStats(
+  input: { address: string },
+  ctx: ToolContext,
+): Promise<string> {
+  try {
+    const statsService = new AppService(ctx.prisma);
+    const stats = await statsService.getWalletStats(input.address);
+    return JSON.stringify(stats);
+  } catch (err) {
+    return JSON.stringify({ error: `Failed to fetch stats for wallet: ${err.message}` });
+  }
+}
+

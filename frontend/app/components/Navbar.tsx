@@ -24,8 +24,10 @@ export default function Navbar() {
     e.preventDefault();
     if (searchVal.trim()) {
       searchWallet(searchVal.trim());
+      router.push("/dashboard");
     }
   };
+
 
   const tickerItems = [
     {

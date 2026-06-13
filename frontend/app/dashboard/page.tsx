@@ -22,13 +22,55 @@ export default function DashboardPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Adjust mock data slightly based on searched address for realism
+  const [stats, setStats] = useState<{
+    portfolioValue: number;
+    totalVolumeTraded: number;
+    transactionCount: number;
+    uniqueDexPools: number;
+    heatmap?: number[][];
+    transactions?: any[];
+    charts: {
+      volumeTrend: any[];
+      dexDistribution: any[];
+      bridgeVolume: any[];
+    };
+  } | null>(null);
+
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    let active = true;
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const res = await fetch(`http://localhost:3001/stats/${explorerWallet}?timeframe=${timeframe}&timezone=${timeZone}`);
+        if (!res.ok) throw new Error("Failed to fetch stats");
+        const data = await res.json();
+        if (active) {
+          setStats(data);
+        }
+      } catch (err) {
+        console.error("Error loading stats:", err);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+    fetchStats();
+    return () => {
+      active = false;
+    };
+  }, [explorerWallet, timeframe]);
+
+
+  const displayVal = stats ? `$${stats.portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00";
+  const displayVolume = stats ? `$${stats.totalVolumeTraded.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "$0.00";
+  const displayTxs = stats ? stats.transactionCount : 0;
+  const displayDexs = stats ? stats.uniqueDexPools : 0;
   const isAgentAddress = explorerWallet.toLowerCase().includes("agent");
-  const displayVal = isAgentAddress ? "$1,450.00" : "$12,531.79";
-  const displayVolume = isAgentAddress ? "$4,250.00" : "$48,930.50";
-  const displayTxs = isAgentAddress ? 12 : 142;
-  const displayDexs = isAgentAddress ? 2 : 7;
-  const displaySlippage = isAgentAddress ? "0.2%" : "0.55%";
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -85,35 +127,35 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           label="Estimated Portfolio Value"
-          value={displayVal}
+          value={loading ? "Loading..." : displayVal}
           change="+8.42%"
           isPositive={true}
           subtext="Updated just now"
-          sparklineData={[11200, 11500, 11900, 11600, 12100, 12531]}
+          sparklineData={[11200, 11500, 11900, 11600, 12100, stats?.portfolioValue || 12531]}
         />
         <MetricCard
           label="Total Volume Traded"
-          value={displayVolume}
+          value={loading ? "Loading..." : displayVolume}
           change="+15.3%"
           isPositive={true}
           subtext="Volume scoped to timeframe"
-          sparklineData={[42000, 43500, 44200, 46100, 48930]}
+          sparklineData={[42000, 43500, 44200, 46100, stats?.totalVolumeTraded || 48930]}
         />
         <MetricCard
           label="Transaction Counts"
-          value={displayTxs.toString()}
+          value={loading ? "Loading..." : displayTxs.toString()}
           change="+4.8%"
           isPositive={true}
           subtext="Valid RPC signatures"
-          sparklineData={[120, 128, 131, 135, 142]}
+          sparklineData={[120, 128, 131, 135, stats?.transactionCount || 142]}
         />
         <MetricCard
           label="Unique DEX Pools"
-          value={displayDexs.toString()}
+          value={loading ? "Loading..." : displayDexs.toString()}
           change="-2.1%"
           isPositive={false}
           subtext="Liquidity routing pools"
-          sparklineData={[9, 8, 8, 7, 7]}
+          sparklineData={[9, 8, 8, 7, stats?.uniqueDexPools || 7]}
         />
       </div>
 
@@ -131,9 +173,14 @@ export default function DashboardPage() {
         </div>
         
         <div className="flex-1 w-full min-h-0">
-          <VolumeTrendChart />
+          {loading ? (
+            <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">Loading chart...</div>
+          ) : (
+            <VolumeTrendChart data={stats?.charts?.volumeTrend} />
+          )}
         </div>
       </div>
+
 
       {/* Grid: Charts Row 2 (Split Donut and Bars) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -145,7 +192,11 @@ export default function DashboardPage() {
             <span className="text-[10px] text-slate-500 font-mono">Top swap routing endpoints by volume share</span>
           </div>
           <div className="flex-1 flex items-center justify-center min-h-0">
-            <DexDistributionChart />
+            {loading ? (
+              <div className="text-slate-400 text-sm">Loading chart...</div>
+            ) : (
+              <DexDistributionChart data={stats?.charts?.dexDistribution} />
+            )}
           </div>
         </div>
 
@@ -156,17 +207,31 @@ export default function DashboardPage() {
             <span className="text-[10px] text-slate-500 font-mono">USDC bridge deposit inflow channels</span>
           </div>
           <div className="flex-1 flex items-center min-h-0 pt-4">
-            <BridgeBarChart />
+            {loading ? (
+              <div className="text-slate-400 text-sm">Loading chart...</div>
+            ) : (
+              <BridgeBarChart data={stats?.charts?.bridgeVolume} />
+            )}
           </div>
         </div>
+
       </div>
 
       {/* Row 3: Heatmap */}
-      <ActivityHeatmap />
+      {loading ? (
+        <div className="glass-panel p-5 text-center text-slate-400 text-sm">Loading activity...</div>
+      ) : (
+        <ActivityHeatmap data={stats?.heatmap} />
+      )}
 
       {/* Row 4: Transaction List */}
-      <TransactionTable transactions={activityLog.filter(act => act.wallet === explorerWallet || isAgentAddress)} />
+      {loading ? (
+        <div className="glass-panel p-5 text-center text-slate-400 text-sm">Loading transactions...</div>
+      ) : (
+        <TransactionTable transactions={stats?.transactions || []} />
+      )}
 
     </div>
   );
 }
+

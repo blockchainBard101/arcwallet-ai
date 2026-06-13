@@ -13,7 +13,7 @@ interface AgentLlmConfig {
   provider: 'anthropic' | 'openai' | 'grok';
   apiKey: string;
   model: string;
-  agentId: string;
+  agentId?: string;
   agentName: string;
 }
 
@@ -42,13 +42,16 @@ Rules you MUST follow:
 4. Keep responses concise, clear, and human-friendly. Format numbers properly (e.g. "1,250.00 USDC").
 5. If a tool returns an error, explain it plainly and suggest next steps.`;
 
-function buildSystemPrompt(agentId: string, agentName: string): string {
-  return `${BASE_SYSTEM_PROMPT}
-
+function buildSystemPrompt(agentId: string | undefined, agentName: string): string {
+  const agentContext = agentId ? `
 ## Current Agent Context
 You are currently acting as the agent named "${agentName}" (ID: ${agentId}).
 When the user refers to "my balance", "my wallet", "this agent", or asks anything without specifying another agent,
-ALWAYS default to agentId "${agentId}". Do NOT call list_agents for single-agent questions.`;
+ALWAYS default to agentId "${agentId}". Do NOT call list_agents for single-agent questions.` : `
+## Current Agent Context
+You are currently acting as the Public Explorer Agent (${agentName}). You can query public wallet statistics and help the user explore the Arc blockchain.`;
+  return `${BASE_SYSTEM_PROMPT}
+${agentContext}`;
 }
 
 const MAX_HISTORY_MESSAGES = 20;
@@ -131,9 +134,17 @@ export class LlmService {
     agentId?: string,
   ): Promise<AgentLlmConfig> {
     if (!agentId) {
-      throw new BadRequestException(
-        'agentId is required. Each chat is tied to a specific agent and uses its stored API key.',
-      );
+      const provider = (process.env.LLM_PROVIDER || 'openai') as AgentLlmConfig['provider'];
+      const apiKey = provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY;
+      if (!apiKey || apiKey.trim() === '') {
+        throw new BadRequestException('No default LLM API key configured on the server.');
+      }
+      return {
+        provider,
+        apiKey,
+        model: PROVIDER_MODELS[provider] ?? PROVIDER_MODELS.openai,
+        agentName: 'Public Explorer Agent',
+      };
     }
 
     const agent = await this.prisma.agent.findFirst({
@@ -369,11 +380,17 @@ export class LlmService {
       if (toolName === 'fund_agent' && data.depositAddress) {
         structuredData.actions.push({ type: 'fund_agent', payload: data });
       }
-      if (toolName === 'get_activity_log' && data.logs) {
-        structuredData.transactions.push(...data.logs);
+      if (toolName === 'get_public_wallet_stats') {
+        if (data.charts) {
+          structuredData.charts = data.charts;
+        }
+        if (data.transactions) {
+          structuredData.transactions.push(...data.transactions);
+        }
       }
     } catch {
       // silently skip malformed results
     }
   }
+
 }

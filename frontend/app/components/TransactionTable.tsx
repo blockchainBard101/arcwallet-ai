@@ -1,11 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
-import { ArrowLeftRight, ArrowDownLeft, ArrowUpRight, CheckCircle2, AlertCircle, Clock, ExternalLink } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ArrowLeftRight, ArrowDownLeft, ArrowUpRight, CheckCircle2, AlertCircle, Clock, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { Activity } from "../context/AppContext";
 
 export default function TransactionTable({ transactions }: { transactions: Activity[] }) {
   const [filterType, setFilterType] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterType, transactions]);
 
   const filteredTxs = transactions.filter((tx) => {
     if (filterType === "all") return true;
@@ -13,6 +18,30 @@ export default function TransactionTable({ transactions }: { transactions: Activ
     if (filterType === "transfers") return tx.type === "transfer";
     return true;
   });
+
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredTxs.length / itemsPerPage) || 1;
+  const paginatedTxs = filteredTxs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+
+  const formatTimestamp = (timestampStr: string) => {
+    if (!timestampStr) return "—";
+    const dateInput = timestampStr.includes("Z") || timestampStr.includes("+") 
+      ? timestampStr 
+      : `${timestampStr.replace(" ", "T")}Z`;
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return timestampStr;
+    
+    return date.toLocaleString(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZoneName: "short"
+    });
+  };
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -102,21 +131,33 @@ export default function TransactionTable({ transactions }: { transactions: Activ
           </thead>
           <tbody className="divide-y divide-[#22252F]">
             {filteredTxs.length > 0 ? (
-              filteredTxs.map((tx) => (
+              paginatedTxs.map((tx) => (
                 <tr key={tx.id} className="text-xs text-slate-300 hover:bg-neon-blue/5 transition-colors group">
                   <td className="py-3.5 px-2">{getIcon(tx.type)}</td>
                   <td className="py-3.5 px-2 font-mono text-[11px] font-medium group-hover:text-neon-cyan transition-colors">
-                    <span className="flex items-center gap-1 cursor-pointer">
-                      {tx.id.replace("act-", "0x").slice(0, 10)}...{tx.id.slice(-4)}
-                      <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </span>
+                    {tx.id.startsWith("0x") || tx.id.startsWith("tx-") ? (
+                      <a
+                        href={`https://testnet.arcscan.app/tx/${tx.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 hover:text-neon-cyan transition-colors cursor-pointer w-fit"
+                      >
+                        {tx.id.replace("act-", "0x").slice(0, 10)}...{tx.id.slice(-4)}
+                        <ExternalLink className="w-3 h-3 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </a>
+                    ) : (
+                      <span className="text-slate-400">
+                        {tx.id.slice(0, 10)}...{tx.id.slice(-4)}
+                      </span>
+                    )}
                   </td>
+
                   <td className="py-3.5 px-2 text-slate-200 max-w-[280px] font-medium leading-relaxed">
                     {tx.description}
                   </td>
                   <td className="py-3.5 px-2 font-mono font-bold text-slate-100">{tx.value || "—"}</td>
                   <td className="py-3.5 px-2">{getStatusBadge(tx.status)}</td>
-                  <td className="py-3.5 px-2 text-slate-500 font-medium font-mono">{tx.timestamp}</td>
+                  <td className="py-3.5 px-2 text-slate-500 font-medium font-mono">{formatTimestamp(tx.timestamp)}</td>
                 </tr>
               ))
             ) : (
@@ -129,6 +170,30 @@ export default function TransactionTable({ transactions }: { transactions: Activ
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-[#22252F] pt-4 mt-2">
+          <span className="text-[10px] text-slate-500 font-mono">
+            Showing Page {currentPage} of {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-[#22252F] bg-[#090A0F] text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[#22252F] disabled:hover:text-slate-400"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-[#22252F] bg-[#090A0F] text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:border-[#22252F] disabled:hover:text-slate-400"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

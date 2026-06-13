@@ -3,22 +3,22 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "../context/AppContext";
+import { usePrivy } from "@privy-io/react-auth";
 import { Send, User, Bot, HelpCircle, LayoutDashboard, Wallet, Compass, Search, ExternalLink } from "lucide-react";
 
 export default function ChatPage() {
   const router = useRouter();
-  const { chats, addChatMessage, searchWallet, clearChat, connectedWallet } = useApp();
+  const { chats, addChatMessage, searchWallet, clearChat, connectedWallet, recentExplorations } = useApp();
+  const { getAccessToken } = usePrivy();
   const [inputText, setInputText] = useState("");
+  const [isResponding, setIsResponding] = useState(false);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
 
   const thread = chats["public"] || [];
 
   const userAddress = connectedWallet?.address || "0x71C7656EC7ab88b098defB751B7401B5f6d8976F";
 
-  const recentSearches = [
-    userAddress,
-    "0xArcAgent1A2zP1eP5q77ab",
-    "Circle Bridge CCTP Pools",
-  ];
+  const recentSearches = recentExplorations.length > 0 ? recentExplorations : [userAddress];
 
   const suggestedPrompts = [
     { label: connectedWallet ? "Analyze my wallet" : "Analyze default wallet", text: `Analyze wallet ${userAddress}` },
@@ -26,55 +26,71 @@ export default function ChatPage() {
     { label: "Verify agent wallet", text: "What is the status of agent wallet 0xArcAgent1A2zP1eP5q77ab?" },
   ];
 
-  const handleSend = (textToSend: string) => {
-    if (!textToSend.trim()) return;
+  const handleSend = async (textToSend: string) => {
+    if (!textToSend.trim() || isResponding) return;
 
     addChatMessage("public", textToSend, "user");
     setInputText("");
+    setIsResponding(true);
 
-    setTimeout(() => {
-      const query = textToSend.toLowerCase();
-      
-      if (query.includes("0x")) {
-        // Extract address
-        const match = textToSend.match(/0x[a-fA-F0-9]+/);
-        const address = match ? match[0] : userAddress;
-        
-        addChatMessage(
-          "public",
-          `I have scanned the blockchain for ${address}. Here is a summary of the holdings and risk score:`,
-          "agent",
-          {
-            type: "wallet_preview",
-            address: address,
-            balance: address.includes("Agent1") ? "1,450.00 USDC" : "12,531.79 USDC",
-            tokens: ["USDC", "ARC", "USDT"],
-            txCount: 48,
-            riskScore: 8,
-          }
-        );
-      } else if (query.includes("bridge") || query.includes("cctp")) {
-        addChatMessage(
-          "public",
-          "Based on the indexer data, the Circle CCTP Bridge has processed $12,500 USDC in volume over the past 7 days, representing 45% of total bridge flows.",
-          "agent",
-          {
-            type: "metric_preview",
-            label: "Bridge Flows",
-            data: [
-              { name: "Circle CCTP", volume: "$12,500" },
-              { name: "Arc Native", volume: "$8,900" },
-            ]
-          }
-        );
-      } else {
-        addChatMessage(
-          "public",
-          "I can assist with querying blockchain data on Arc. Try searching a wallet address (starting with 0x) to run deep diagnostics, or ask about general bridge flows.",
-          "agent"
-        );
+    try {
+      const token = await getAccessToken();
+      const res = await fetch("http://localhost:3001/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: textToSend,
+          sessionId,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        addChatMessage("public", `⚠️ Error: ${err.message || "The explorer agent is currently unavailable."}`, "agent");
+        return;
       }
-    }, 1000);
+
+      const data = await res.json();
+
+      if (data.sessionId && !sessionId) {
+        setSessionId(data.sessionId);
+      }
+
+      // Generate structured card if get_public_wallet_stats was run
+      let customData: any = null;
+      const ranStatsTool = data.toolsUsed?.includes("get_public_wallet_stats");
+      const matchedAddr = textToSend.match(/0x[a-fA-F0-9]+/);
+      const address = matchedAddr ? matchedAddr[0] : null;
+
+      if (ranStatsTool && address) {
+        try {
+          const statsRes = await fetch(`http://localhost:3001/stats/${address}?timezone=${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+          const stats = statsRes.ok ? await statsRes.json() : null;
+          if (stats) {
+            customData = {
+              type: "wallet_preview",
+              address: address,
+              balance: `${stats.portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`,
+              tokens: ["USDC", "ARC", "USDT"],
+              txCount: stats.transactionCount,
+              riskScore: 8,
+            };
+          }
+        } catch (e) {
+          console.error("Failed to load inline preview stats:", e);
+        }
+      }
+
+      addChatMessage("public", data.message, "agent", customData);
+    } catch (e) {
+      console.error(e);
+      addChatMessage("public", "⚠️ Connection error — is the backend running on port 3001?", "agent");
+    } finally {
+      setIsResponding(false);
+    }
   };
 
   const handleSelectPreview = (address: string) => {
@@ -205,6 +221,23 @@ export default function ChatPage() {
               </div>
             </div>
           ))}
+          {isResponding && (
+            <div className="flex gap-3.5 max-w-[85%] self-start animate-pulse">
+              <div className="w-8.5 h-8.5 rounded-xl border bg-[#090A0F] border-[#22252F] text-neon-cyan flex items-center justify-center shrink-0">
+                <Bot className="w-4.5 h-4.5" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <div className="bg-[#090A0F]/60 text-slate-400 border border-[#22252F] rounded-2xl rounded-tl-none p-4 text-xs flex items-center gap-3">
+                  <div className="flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-neon-cyan animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-neon-cyan animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-neon-cyan animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                  </div>
+                  <span className="font-mono text-[9px] tracking-wider uppercase text-slate-500">Agent scanning RPC...</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Suggested Prompt Chips */}

@@ -2,12 +2,12 @@
 
 import React, { useState } from "react";
 
-export default function ActivityHeatmap() {
+export default function ActivityHeatmap({ data }: { data?: number[][] }) {
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const hours = ["12am", "2am", "4am", "6am", "8am", "10am", "12pm", "2pm", "4pm", "6pm", "8pm", "10pm"];
 
   // Mock intensity matrix (7 days x 12 hour blocks)
-  const matrix = [
+  const defaultMatrix = [
     [1, 0, 2, 4, 3, 0, 5, 8, 3, 2, 1, 0], // Mon
     [0, 1, 0, 3, 5, 2, 9, 6, 4, 3, 2, 1], // Tue
     [2, 0, 1, 2, 4, 1, 6, 7, 5, 8, 3, 0], // Wed
@@ -17,7 +17,10 @@ export default function ActivityHeatmap() {
     [2, 3, 1, 0, 1, 1, 2, 3, 4, 2, 1, 1], // Sun
   ];
 
+  const matrix = data || defaultMatrix;
+
   const [hoveredCell, setHoveredCell] = useState<{ dayIdx: number; hourIdx: number; count: number } | null>(null);
+
 
   const getBgColor = (count: number) => {
     if (count === 0) return "bg-[#090A0F]/40 border-[#22252F]";

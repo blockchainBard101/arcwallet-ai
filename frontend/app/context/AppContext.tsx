@@ -93,6 +93,7 @@ interface AppContextType {
   addAlert: (condition: string, channel: string) => void;
   deleteAlert: (id: string) => void;
   clearChat: (chatId: string) => void;
+  recentExplorations: string[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -254,6 +255,24 @@ const INITIAL_ACTIVITY: Activity[] = [
 export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
   const [explorerWallet, setExplorerWallet] = useState<string>("0x71C7656EC7ab88b098defB751B7401B5f6d8976F");
+  const [recentExplorations, setRecentExplorations] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("recent_explorations");
+      if (stored) {
+        try {
+          setRecentExplorations(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        const initial = ["0x71C7656EC7ab88b098defB751B7401B5f6d8976F"];
+        setRecentExplorations(initial);
+        localStorage.setItem("recent_explorations", JSON.stringify(initial));
+      }
+    }
+  }, []);
   const { user: privyUser, authenticated, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
 
@@ -273,6 +292,14 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
         };
       });
       setExplorerWallet(address);
+      setRecentExplorations((prev) => {
+        if (prev.some((addr) => addr.toLowerCase() === address.toLowerCase())) return prev;
+        const next = [address, ...prev].slice(0, 5);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("recent_explorations", JSON.stringify(next));
+        }
+        return next;
+      });
 
       // Asynchronously fetch live balances from the Arc Testnet RPC node
       const fetchBalances = async () => {
@@ -384,6 +411,25 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
   const [rules, setRules] = useState<Record<string, Rule[]>>(INITIAL_RULES);
   const [alerts, setAlerts] = useState<Alert[]>(INITIAL_ALERTS);
   const [chats, setChats] = useState<Record<string, ChatMessage[]>>(INITIAL_CHATS);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("arcai_chats");
+      if (stored) {
+        try {
+          setChats(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed to parse chats from localStorage:", e);
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && chats !== INITIAL_CHATS) {
+      localStorage.setItem("arcai_chats", JSON.stringify(chats));
+    }
+  }, [chats]);
   const [activityLog, setActivityLog] = useState<Activity[]>(INITIAL_ACTIVITY);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -425,6 +471,14 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
     }
     setExplorerWallet(address);
     triggerToast(`Loaded data for wallet ${address.slice(0, 6)}...${address.slice(-4)}`, "success");
+    setRecentExplorations((prev) => {
+      const filtered = prev.filter((addr) => addr.toLowerCase() !== address.toLowerCase());
+      const next = [address, ...filtered].slice(0, 5);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("recent_explorations", JSON.stringify(next));
+      }
+      return next;
+    });
   };
 
   const addAgent = async (name: string, model: string, initialRuleText?: string, llmConfig?: { provider: string; apiKey: string }) => {
@@ -705,6 +759,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
         addAlert,
         deleteAlert,
         clearChat,
+        recentExplorations,
       }}
     >
       {children}

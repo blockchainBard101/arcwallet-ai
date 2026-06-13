@@ -138,4 +138,20 @@ export const CORE_TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: 'get_public_wallet_stats',
+    description:
+      'Retrieve live analytics, balances, transaction counts, volume trends, and bridge volumes for ANY public wallet address on the Arc blockchain. Use this when the user enters or asks about a 0x... wallet address stats, transaction history, or portfolio value.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'string',
+          description: 'The 0x EVM wallet address to get stats for.',
+        },
+      },
+      required: ['address'],
+    },
+  },
 ];
+

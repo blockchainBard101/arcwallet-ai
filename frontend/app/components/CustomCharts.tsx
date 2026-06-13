@@ -36,7 +36,8 @@ export function VolumeTrendChart({
   const graphHeight = chartHeight - paddingTop - paddingBottom;
 
   const minVal = 0;
-  const maxVal = Math.max(...data.map((d) => d.value)) * 1.15 || 1000;
+  const activeData = data.filter((d) => d.value !== undefined && d.value !== null);
+  const maxVal = Math.max(...activeData.map((d) => d.value)) * 1.15 || 1000;
 
   // Coordinate conversion helpers
   const getX = (index: number) => {
@@ -49,14 +50,17 @@ export function VolumeTrendChart({
   // Build svg path
   let pathD = "";
   let areaD = "";
-  if (data.length > 0) {
-    pathD = `M ${getX(0)} ${getY(data[0].value)}`;
-    areaD = `M ${getX(0)} ${getY(0)} L ${getX(0)} ${getY(data[0].value)}`;
-    for (let i = 1; i < data.length; i++) {
-      pathD += ` L ${getX(i)} ${getY(data[i].value)}`;
-      areaD += ` L ${getX(i)} ${getY(data[i].value)}`;
+  if (activeData.length > 0) {
+    const startIdx = data.indexOf(activeData[0]);
+    pathD = `M ${getX(startIdx)} ${getY(activeData[0].value)}`;
+    areaD = `M ${getX(startIdx)} ${getY(0)} L ${getX(startIdx)} ${getY(activeData[0].value)}`;
+    for (let i = 1; i < activeData.length; i++) {
+      const origIdx = data.indexOf(activeData[i]);
+      pathD += ` L ${getX(origIdx)} ${getY(activeData[i].value)}`;
+      areaD += ` L ${getX(origIdx)} ${getY(activeData[i].value)}`;
     }
-    areaD += ` L ${getX(data.length - 1)} ${getY(0)} Z`;
+    const endIdx = data.indexOf(activeData[activeData.length - 1]);
+    areaD += ` L ${getX(endIdx)} ${getY(0)} Z`;
   }
 
   // Draw grid lines
@@ -108,6 +112,7 @@ export function VolumeTrendChart({
 
         {/* Interactive hover points & vertical track lines */}
         {data.map((d, idx) => {
+          if (d.value === undefined || d.value === null) return null;
           const x = getX(idx);
           const y = getY(d.value);
           const isHovered = hoveredIdx === idx;
@@ -133,6 +138,7 @@ export function VolumeTrendChart({
           );
         })}
       </svg>
+
 
       {/* Tooltip Overlay */}
       {hoveredIdx !== null && (
