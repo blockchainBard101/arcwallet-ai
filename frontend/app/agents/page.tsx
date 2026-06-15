@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "../context/AppContext";
-import { Bot, Plus, Play, Pause, ExternalLink, Eye, EyeOff, Zap, TrendingDown, RefreshCw, Bell, MessageSquare, ArrowRight, Copy } from "lucide-react";
+import { Bot, Plus, Play, Pause, ExternalLink, Zap, TrendingDown, RefreshCw, Bell, MessageSquare, ArrowRight, Copy } from "lucide-react";
 import MetricCard from "../components/MetricCard";
 
 const LLM_PROVIDERS = [
@@ -245,53 +245,6 @@ export default function AgentsPage() {
                   className="h-10 px-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
                   required
                 />
-              </div>
-
-              {/* LLM Provider + API Key */}
-              <div className="flex flex-col gap-2">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Cognitive Engine</label>
-                {/* Provider tabs */}
-                <div className="flex gap-1.5">
-                  {LLM_PROVIDERS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => { setProvider(p.id); setApiKey(""); }}
-                      className={`flex-1 h-8 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
-                        provider === p.id
-                          ? "border-neon-blue/60 bg-neon-blue/10 text-neon-blue"
-                          : "border-[#22252F] bg-[#090A0F] text-slate-400 hover:text-slate-200 hover:border-[#2e3140]"
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-                {/* API Key input */}
-                <div className="relative">
-                  <input
-                    id="agent-api-key"
-                    type={showKey ? "text" : "password"}
-                    placeholder={`Paste your ${LLM_PROVIDERS.find(p => p.id === provider)?.label} API key (${LLM_PROVIDERS.find(p => p.id === provider)?.hint})`}
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    autoComplete="off"
-                    spellCheck={false}
-                    required
-                    className="w-full h-10 pl-3.5 pr-10 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white font-mono focus:outline-none focus:border-neon-blue/50 placeholder:text-slate-600 transition-colors"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKey((v) => !v)}
-                    aria-label={showKey ? "Hide API key" : "Show API key"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
-                  >
-                    {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-                <p className="text-[9px] text-slate-600 leading-relaxed">
-                  Your key is stored only in this agent&apos;s encrypted configuration and never logged.
-                </p>
               </div>
 
               {/* Natural Language Rule */}

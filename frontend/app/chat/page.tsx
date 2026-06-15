@@ -1,21 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp, getBackendUrl } from "../context/AppContext";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { Send, User, Bot, HelpCircle, LayoutDashboard, Wallet, Compass, Search, ExternalLink, CreditCard, Copy, Check, Sparkles, ArrowRight } from "lucide-react";
+import { Send, User, Bot, HelpCircle, LayoutDashboard, Wallet, Compass, Search, ExternalLink, CreditCard, Copy, Check, Sparkles, ArrowRight, Plus, MessageSquare } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 export default function ChatPage() {
   const router = useRouter();
-  const { chats, addChatMessage, searchWallet, clearChat, connectedWallet, recentExplorations, triggerToast } = useApp();
-  const { getAccessToken } = usePrivy();
+  const { chats, addChatMessage, searchWallet, clearChat, connectedWallet, recentExplorations, triggerToast, setAgentChats } = useApp();
+  const { getAccessToken, authenticated } = usePrivy();
   const { wallets } = useWallets();
   const [inputText, setInputText] = useState("");
   const [isResponding, setIsResponding] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+
+  const handleCopyMessage = (text: string, msgId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMsgId(msgId);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  };
 
   const handleExecuteRealTransaction = async (preparedPayload: any) => {
     if (!preparedPayload || !preparedPayload.transaction) {
@@ -26,10 +32,16 @@ export default function ChatPage() {
     triggerToast("Initiating secure signature request...", "info");
 
     try {
-      const activeWallet = wallets?.[0];
+      const activeWallet = wallets?.find((w) => w.walletClientType === "privy") || wallets?.[0];
       if (!activeWallet) {
         triggerToast("No connected wallet found. Please authenticate.", "error");
         return;
+      }
+
+      const ARC_CHAIN_ID = 5042002;
+      if (activeWallet.chainId !== `eip155:${ARC_CHAIN_ID}` && activeWallet.chainId !== String(ARC_CHAIN_ID) && activeWallet.chainId !== ARC_CHAIN_ID) {
+        triggerToast("Switching network to Arc Testnet...", "info");
+        await activeWallet.switchChain(ARC_CHAIN_ID);
       }
 
       const provider = await activeWallet.getEthereumProvider();
@@ -47,19 +59,31 @@ export default function ChatPage() {
         transport: custom(provider),
       });
 
-      const signedTx = await client.signTransaction({
+      const txToSign: any = {
         to: txParams.to as `0x${string}`,
         data: txParams.data as `0x${string}`,
         value: txParams.value ? BigInt(txParams.value) : 0n,
-        nonce: Number(txParams.nonce),
         gas: txParams.gasLimit ? BigInt(txParams.gasLimit) : 100000n,
-      });
+      };
+
+      if (txParams.nonce !== undefined && txParams.nonce !== null) {
+        const parsedNonce = Number(txParams.nonce);
+        if (!isNaN(parsedNonce)) {
+          txToSign.nonce = parsedNonce;
+        }
+      }
+
+      const signedTx = await client.signTransaction(txToSign);
 
       triggerToast("Transaction signed successfully. Broadcasting...", "info");
 
+      const token = await getAccessToken();
       const res = await fetch(`${getBackendUrl()}/transactions/execute`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ signedTx }),
       });
 
@@ -80,6 +104,59 @@ export default function ChatPage() {
     } catch (err: any) {
       console.error(err);
       triggerToast(`Execution failed: ${err.message || err}`, "error");
+    }
+  };
+
+  const [sessions, setSessions] = useState<any[]>([]);
+
+  // Fetch recent explorer chat sessions
+  useEffect(() => {
+    if (!authenticated) return;
+    const fetchSessions = async () => {
+      try {
+        const token = await getAccessToken();
+        const res = await fetch(`${getBackendUrl()}/chat/sessions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const allSessions = await res.json();
+          // Filter to only show explorer chats (where agentId is null or undefined)
+          const explorerSessions = allSessions.filter((s: any) => !s.agentId);
+          setSessions(explorerSessions);
+        }
+      } catch (err) {
+        console.error("Failed to fetch chat sessions:", err);
+      }
+    };
+    fetchSessions();
+  }, [authenticated, sessionId]);
+
+  const handleSelectSession = async (sessId: string) => {
+    try {
+      setIsResponding(true);
+      const token = await getAccessToken();
+      const res = await fetch(`${getBackendUrl()}/chat/sessions/${sessId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const dbMessages = await res.json();
+        const mappedMessages = dbMessages.map((m: any) => ({
+          id: m.id,
+          sender: m.role === "user" ? "user" : "agent",
+          text: m.content,
+          timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          data: m.payload ? JSON.parse(JSON.stringify(m.payload)) : undefined,
+        }));
+        
+        setAgentChats("public", mappedMessages);
+        setSessionId(sessId);
+        triggerToast("Chat session loaded", "success");
+      }
+    } catch (err) {
+      console.error("Failed to load chat messages:", err);
+      triggerToast("Failed to load session", "error");
+    } finally {
+      setIsResponding(false);
     }
   };
 
@@ -136,7 +213,7 @@ export default function ChatPage() {
 
       if (txAction?.payload) {
         const p = txAction.payload;
-        const activeWallet = wallets?.[0];
+        const activeWallet = wallets?.find((w) => w.walletClientType === "privy") || wallets?.[0];
         const fromAddr = p.transaction?.from || activeWallet?.address || "Connected Wallet";
         const toAddr = p.recipientAddress || p.transaction?.to || "—";
         const amountStr = p.amount ? `${p.amount} USDC` : "—";
@@ -233,6 +310,35 @@ export default function ChatPage() {
             </button>
           ))}
         </div>
+
+        {/* Recent Chat Sessions */}
+        <div className="flex flex-col gap-0.5 mt-4 pt-4 border-t border-[#22252F]">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5 text-neon-cyan" />
+            Recent Explorer Chats
+          </span>
+          <span className="text-[10px] text-slate-500 font-medium">Click to reload chat history</span>
+        </div>
+
+        <div className="flex flex-col gap-2 mt-2">
+          {sessions.length === 0 ? (
+            <span className="text-[10px] text-slate-500 italic">No recent chats</span>
+          ) : (
+            sessions.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => handleSelectSession(s.id)}
+                className={`text-left p-2.5 rounded-lg border transition-all text-xs font-semibold truncate cursor-pointer ${
+                  sessionId === s.id
+                    ? "border-neon-cyan/50 bg-neon-cyan/5 text-white"
+                    : "border-[#22252F] bg-[#090A0F]/40 text-slate-400 hover:text-white"
+                }`}
+              >
+                Chat {s.id.slice(0, 8)} ({s._count?.messages || 0} msgs)
+              </button>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Main Chat Stream */}
@@ -251,10 +357,15 @@ export default function ChatPage() {
             </div>
           </div>
           <button
-            onClick={() => clearChat("public")}
-            className="px-2.5 py-1 text-[10px] text-slate-400 hover:text-slate-200 border border-[#22252F] rounded hover:bg-[#22252F] transition-colors cursor-pointer"
+            onClick={() => {
+              clearChat("public");
+              setSessionId(undefined);
+              triggerToast("Started new chat session", "success");
+            }}
+            className="px-2.5 py-1 text-[10px] text-slate-400 hover:text-slate-200 border border-[#22252F] rounded hover:bg-[#22252F] transition-colors cursor-pointer flex items-center gap-1"
           >
-            Clear Thread
+            <Plus className="w-3.5 h-3.5" />
+            New Chat
           </button>
         </div>
 
@@ -263,7 +374,7 @@ export default function ChatPage() {
           {thread.map((msg) => (
             <div
               key={msg.id}
-              className={`flex gap-3.5 max-w-[85%] ${msg.sender === "user" ? "self-end flex-row-reverse" : "self-start"}`}
+              className={`flex gap-3.5 max-w-[85%] group/msg ${msg.sender === "user" ? "self-end flex-row-reverse" : "self-start"}`}
             >
               <div className={`w-8.5 h-8.5 rounded-xl border flex items-center justify-center shrink-0 ${
                 msg.sender === "user" ? "bg-neon-blue/10 border-neon-blue/20 text-neon-blue" : "bg-[#090A0F] border-[#22252F] text-neon-cyan"
@@ -272,9 +383,20 @@ export default function ChatPage() {
               </div>
 
               <div className="flex flex-col gap-2.5">
-                <div className={`p-4 rounded-2xl text-xs leading-relaxed ${
+                <div className={`relative p-4 rounded-2xl text-xs leading-relaxed ${
                   msg.sender === "user" ? "bg-neon-blue/10 text-slate-200 rounded-tr-none" : "bg-[#090A0F]/60 text-slate-300 border border-[#22252F] rounded-tl-none"
                 }`}>
+                  {/* Copy button — shows on hover */}
+                  <button
+                    onClick={() => handleCopyMessage(msg.text, msg.id)}
+                    className="absolute top-2 right-2 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded-md bg-[#15161C] border border-[#22252F] text-slate-400 hover:text-white cursor-pointer z-10"
+                    title="Copy message"
+                  >
+                    {copiedMsgId === msg.id
+                      ? <Check className="w-3 h-3 text-neon-cyan" />
+                      : <Copy className="w-3 h-3" />}
+                  </button>
+
                   {msg.sender === "user" ? (
                     <span>{msg.text}</span>
                   ) : (
@@ -421,11 +543,18 @@ export default function ChatPage() {
                     <button
                       onClick={async () => {
                         try {
-                          const activeWallet = wallets?.[0];
+                          const activeWallet = wallets?.find((w) => w.walletClientType === "privy") || wallets?.[0];
                           if (!activeWallet) {
                             triggerToast("No wallet connected.", "error");
                             return;
                           }
+                          
+                          const ARC_CHAIN_ID = 5042002;
+                          if (activeWallet.chainId !== `eip155:${ARC_CHAIN_ID}` && activeWallet.chainId !== String(ARC_CHAIN_ID) && activeWallet.chainId !== ARC_CHAIN_ID) {
+                            triggerToast("Switching network to Arc Testnet...", "info");
+                            await activeWallet.switchChain(ARC_CHAIN_ID);
+                          }
+
                           const provider = await activeWallet.getEthereumProvider();
                           const { createWalletClient, custom, parseUnits } = await import("viem");
                           const { arcTestnet } = await import("viem/chains");

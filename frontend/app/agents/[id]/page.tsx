@@ -335,7 +335,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
       if (txAction?.payload) {
         const p = txAction.payload;
-        const activeWallet = wallets?.[0];
+        const activeWallet = wallets?.find((w) => w.walletClientType === "privy") || wallets?.[0];
         const fromAddr = p.transaction?.from || activeWallet?.address || "Connected Wallet";
         const toAddr = p.recipientAddress || p.transaction?.to || "—";
         const amountStr = p.amount ? `${p.amount} USDC` : "—";
@@ -424,10 +424,15 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
     triggerToast("Initiating secure signature request...", "info");
 
     try {
-      const activeWallet = wallets?.[0];
+      const activeWallet = wallets?.find((w) => w.walletClientType === "privy") || wallets?.[0];
       if (!activeWallet) {
         triggerToast("No connected wallet found. Please authenticate.", "error");
         return;
+      }
+
+      if (activeWallet.chainId !== `eip155:${ARC_CHAIN_ID}` && activeWallet.chainId !== String(ARC_CHAIN_ID) && activeWallet.chainId !== ARC_CHAIN_ID) {
+        triggerToast("Switching network to Arc Testnet...", "info");
+        await activeWallet.switchChain(ARC_CHAIN_ID);
       }
 
       const provider = await activeWallet.getEthereumProvider();
@@ -445,19 +450,31 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
         transport: custom(provider),
       });
 
-      const signedTx = await client.signTransaction({
+      const txToSign: any = {
         to: txParams.to as `0x${string}`,
         data: txParams.data as `0x${string}`,
         value: txParams.value ? BigInt(txParams.value) : 0n,
-        nonce: Number(txParams.nonce),
         gas: txParams.gasLimit ? BigInt(txParams.gasLimit) : 100000n,
-      });
+      };
+
+      if (txParams.nonce !== undefined && txParams.nonce !== null) {
+        const parsedNonce = Number(txParams.nonce);
+        if (!isNaN(parsedNonce)) {
+          txToSign.nonce = parsedNonce;
+        }
+      }
+
+      const signedTx = await client.signTransaction(txToSign);
 
       triggerToast("Transaction signed successfully. Broadcasting...", "info");
 
+      const token = await getAccessToken();
       const res = await fetch(`${getBackendUrl()}/transactions/execute`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ signedTx }),
       });
 

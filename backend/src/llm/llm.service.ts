@@ -159,19 +159,28 @@ export class LlmService {
     }
 
     const config = agent.configuration as Record<string, any>;
-    const provider = (config?.provider ?? 'anthropic') as AgentLlmConfig['provider'];
-    const apiKey = config?.apiKey as string;
+    let provider = config?.provider as AgentLlmConfig['provider'] | undefined;
+    let apiKey = config?.apiKey as string;
+
+    if (!apiKey || apiKey.trim() === '') {
+      // Fallback to server default provider and its key
+      provider = (process.env.LLM_PROVIDER || 'openai') as AgentLlmConfig['provider'];
+      apiKey = (provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY) || '';
+    }
 
     if (!apiKey || apiKey.trim() === '') {
       throw new BadRequestException(
-        `This agent has no API key configured. Please update the agent settings and provide your ${provider} API key.`,
+        `This agent has no API key configured. Please update the agent settings or configure ${provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'} in the server environment.`,
       );
     }
 
+    // Default to the resolved provider's standard model
+    const resolvedProvider = provider || 'openai';
+
     return {
-      provider,
+      provider: resolvedProvider,
       apiKey,
-      model: PROVIDER_MODELS[provider] ?? PROVIDER_MODELS.anthropic,
+      model: PROVIDER_MODELS[resolvedProvider] ?? PROVIDER_MODELS.openai,
       agentId,
       agentName: agent.name,
     };

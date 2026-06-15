@@ -37,7 +37,7 @@ export function VolumeTrendChart({
 
   const minVal = 0;
   const activeData = data.filter((d) => d.value !== undefined && d.value !== null);
-  const maxVal = Math.max(...activeData.map((d) => d.value)) * 1.15 || 1000;
+  const maxVal = activeData.length > 0 ? Math.max(...activeData.map((d) => d.value)) * 1.15 : 1000;
 
   // Coordinate conversion helpers
   const getX = (index: number) => {
@@ -184,9 +184,9 @@ export function PortfolioValueChart({
   const graphWidth = chartWidth - paddingLeft - paddingRight;
   const graphHeight = chartHeight - paddingTop - paddingBottom;
 
-  const minVal = Math.min(...data.map((d) => d.value)) * 0.9 || 0;
-  const maxVal = Math.max(...data.map((d) => d.value)) * 1.05 || 10000;
-  const range = maxVal - minVal;
+  const minVal = data.length > 0 ? Math.min(...data.map((d) => d.value)) * 0.9 : 0;
+  const maxVal = data.length > 0 ? Math.max(...data.map((d) => d.value)) * 1.05 : 10000;
+  const range = (maxVal - minVal) || 1;
 
   const getX = (index: number) => paddingLeft + (index / (data.length - 1)) * graphWidth;
   const getY = (val: number) => paddingTop + graphHeight - ((val - minVal) / range) * graphHeight;
@@ -309,7 +309,7 @@ export function DexDistributionChart({
   const radius = 70;
   const strokeWidth = 22;
 
-  const total = data.reduce((acc, curr) => acc + curr.value, 0);
+  const total = data.reduce((acc, curr) => acc + curr.value, 0) || 1;
   const circumference = 2 * Math.PI * radius;
 
   let accumulatedLength = 0;
@@ -401,7 +401,7 @@ export function BridgeBarChart({
 }: {
   data?: BarData[];
 }) {
-  const maxVal = Math.max(...data.map((d) => d.value)) * 1.1 || 1000;
+  const maxVal = data.length > 0 ? Math.max(...data.map((d) => d.value)) * 1.1 : 1000;
 
   return (
     <div className="flex flex-col gap-4 w-full select-none py-1">

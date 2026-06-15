@@ -342,6 +342,36 @@ async function handleBridgeUsdc(
       entitySecret,
     });
 
+    let finalAmount = input.amountUsdc;
+    let forwarderFee = 0;
+
+    try {
+      const estimation = await kit.estimateBridge({
+        from: {
+          adapter,
+          chain: 'Arc_Testnet',
+          address: agent.wallet.address,
+        },
+        to: {
+          recipientAddress: input.recipientAddress,
+          chain: destChain as any,
+          useForwarder: true,
+        },
+        amount: input.amountUsdc.toFixed(6),
+      });
+
+      const forwarderFeeObj = estimation.fees?.find((f: any) => f.type === 'forwarder');
+      if (forwarderFeeObj && forwarderFeeObj.amount) {
+        const fee = parseFloat(forwarderFeeObj.amount);
+        if (!isNaN(fee)) {
+          forwarderFee = fee;
+          finalAmount = input.amountUsdc + fee;
+        }
+      }
+    } catch (estError) {
+      console.warn('[Bridge Estimate Warn]', estError);
+    }
+
     const result = await kit.bridge({
       from: {
         adapter,
@@ -353,8 +383,10 @@ async function handleBridgeUsdc(
         chain: destChain as any,
         useForwarder: true,
       },
-      amount: input.amountUsdc.toFixed(2),
+      amount: finalAmount.toFixed(6),
     });
+
+    const replacer = (key: string, value: any) => typeof value === 'bigint' ? value.toString() : value;
 
     await ctx.prisma.activityLog.create({
       data: {
@@ -365,9 +397,11 @@ async function handleBridgeUsdc(
         payload: JSON.parse(JSON.stringify({
           to: input.recipientAddress,
           amountUsdc: input.amountUsdc,
+          feeUsdc: forwarderFee,
+          totalBurnedUsdc: finalAmount,
           destinationChain: destChain,
           bridgeResult: result,
-        })),
+        }, replacer)),
       },
     });
 
@@ -376,8 +410,9 @@ async function handleBridgeUsdc(
       state: result.state,
       steps: result.steps,
       message: `USDC bridge initiated successfully from ${agent.name} to ${input.destinationChain}. Status: ${result.state}`,
-    });
+    }, replacer);
   } catch (err: any) {
+    console.error('[Bridge Error Details]', err);
     return JSON.stringify({
       success: false,
       error: err.message ?? 'Cross-chain bridge transfer failed.',
