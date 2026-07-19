@@ -20,8 +20,27 @@ model User {
   agents       Agent[]
   alerts       Alert[]
   chatSessions ChatSession[]
+  subscription Subscription?
+  apiKeys      ApiKey[]
 
   @@map("users")
+}
+
+// 📦 Subscription & Billing
+model Subscription {
+  id               String   @id @default(uuid())
+  userId           String   @unique @map("user_id")
+  tier             String   @default("free")  // "free" | "pro" | "power" | "enterprise"
+  llmCallsUsed     Int      @default(0) @map("llm_calls_used")
+  nanopayUsed      Float    @default(0) @map("nanopay_used")
+  currentPeriodStart DateTime @map("current_period_start")
+  currentPeriodEnd   DateTime @map("current_period_end")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
 }
 
 // 💳 Wallets (Supports both Human Signer Wallet and Autonomous Agent Wallet)
@@ -37,6 +56,7 @@ model Wallet {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   agents    Agent[]  @relation("AgentExecutionWallet")
 
+  @@index([userId])
   @@map("wallets")
 }
 
@@ -51,12 +71,16 @@ model Agent {
   createdAt     DateTime @default(now()) @map("created_at")
 
   // Relations
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wallet        Wallet        @relation("AgentExecutionWallet", fields: [walletId], references: [id], onDelete: Cascade)
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet        Wallet           @relation("AgentExecutionWallet", fields: [walletId], references: [id], onDelete: Cascade)
   rules         Rule[]
   activityLogs  ActivityLog[]
   chatSessions  ChatSession[]
+  nanopaymentLogs NanopaymentLog[]
+  yieldDeposits   YieldDeposit[]
 
+  @@index([userId])
+  @@index([walletId])
   @@map("agents")
 }
 
@@ -72,6 +96,7 @@ model Rule {
   // Relations
   agent            Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
+  @@index([agentId])
   @@map("rules")
 }
 
@@ -103,6 +128,7 @@ model ActivityLog {
   // Relations
   agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
+  @@index([agentId])
   @@map("activity_logs")
 }
 
@@ -134,4 +160,62 @@ model ChatMessage {
   session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("chat_messages")
+}
+
+// 💸 Nanopayment Logs (x402 paid API call history per agent)
+model NanopaymentLog {
+  id              String   @id @default(uuid())
+  agentId         String   @map("agent_id")
+  serviceUrl      String   @map("service_url")
+  serviceName     String   @default("unknown") @map("service_name")
+  chain           String   @default("BASE")
+  amountUsdc      Float    @map("amount_usdc")
+  status          String   @default("success") // "success" | "failed"
+  responseSnippet String?  @map("response_snippet")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@map("nanopayment_logs")
+}
+
+// 🌾 Yield Deposits (DeFi Commission Tracking)
+model YieldDeposit {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  agentId         String   @map("agent_id")
+  protocol        String   // e.g., "ArcLend"
+  poolName        String   @map("pool_name")
+  amountUsdc      Float    @map("amount_usdc")
+  txHash          String?  @map("tx_hash")
+  commissionRate  Float    @default(0.10) @map("commission_rate") // 10% of yield
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  agent           Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([userId])
+  @@map("yield_deposits")
+}
+
+// 🏢 Enterprise API Keys
+model ApiKey {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  keyHash     String    @unique @map("key_hash")  // SHA-256 of the raw key
+  name        String    // e.g., "My Integration"
+  tier        String    @default("enterprise")
+  callCount   Int       @default(0) @map("call_count")
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  expiresAt   DateTime? @map("expires_at")
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_keys")
 }

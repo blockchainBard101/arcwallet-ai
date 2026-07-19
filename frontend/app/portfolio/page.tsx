@@ -13,13 +13,13 @@ export default function PortfolioPage() {
 
   // Combine Connected Wallet balance + Agents balances
   const userBalanceUSDC = connectedWallet ? connectedWallet.balanceUSDC : 12531.79;
-  const userBalanceARC = connectedWallet ? connectedWallet.balanceARC : 842.15;
-  const arcUSDValue = 0.489; // ARC token value mock
+  const userBalanceEURC = connectedWallet ? connectedWallet.balanceEURC : 842.15;
+  const eurcUSDValue = 1.09; // EURC token value mock
   
-  const primaryVal = userBalanceUSDC + userBalanceARC * arcUSDValue;
+  const primaryVal = userBalanceUSDC + userBalanceEURC * eurcUSDValue;
   
   const agentsVal = agents.reduce((acc, curr) => {
-    const val = curr.token === "USDC" ? curr.balance : curr.balance * arcUSDValue;
+    const val = curr.token === "USDC" ? curr.balance : curr.balance * eurcUSDValue;
     return acc + val;
   }, 0);
 
@@ -33,7 +33,7 @@ export default function PortfolioPage() {
   // Portfolio allocation assets data
   const allocationData = [
     { name: "USDC (Stable)", value: Math.round(((userBalanceUSDC + agents.filter(a => a.token === "USDC").reduce((acc, c) => acc + c.balance, 0)) / totalPortfolioValue) * 100), color: "#F97316" },
-    { name: "ARC (Utility)", value: Math.round((((userBalanceARC + agents.filter(a => a.token === "ARC").reduce((acc, c) => acc + c.balance, 0)) * arcUSDValue) / totalPortfolioValue) * 100), color: "#ADF02F" },
+    { name: "EURC (Stable)", value: Math.round((((userBalanceEURC + agents.filter(a => a.token === "EURC").reduce((acc, c) => acc + c.balance, 0)) * eurcUSDValue) / totalPortfolioValue) * 100), color: "#ADF02F" },
     { name: "USDT (Stable)", value: 0, color: "#64748B" },
   ];
 
@@ -118,7 +118,7 @@ export default function PortfolioPage() {
               <div className="flex items-center justify-between sm:justify-end gap-6">
                 <div className="flex flex-col text-right font-mono text-xs">
                   <span className="text-white font-bold">${userBalanceUSDC.toLocaleString()} USDC</span>
-                  <span className="text-[10px] text-slate-400">{userBalanceARC.toLocaleString()} ARC</span>
+                  <span className="text-[10px] text-slate-400">{userBalanceEURC.toLocaleString()} EURC</span>
                 </div>
                 <button
                   onClick={() => handleInspectWallet(connectedWallet ? connectedWallet.address : "0x71C7656EC7ab88b098defB751B7401B5f6d8976F")}
@@ -132,7 +132,7 @@ export default function PortfolioPage() {
 
             {/* Agent Wallets */}
             {agents.map((agent) => {
-              const valUSD = agent.token === "USDC" ? agent.balance : agent.balance * arcUSDValue;
+              const valUSD = agent.token === "USDC" ? agent.balance : agent.balance * eurcUSDValue;
               return (
                 <div key={agent.id} className="p-4 rounded-xl border border-[#22252F] bg-[#090A0F]/40 hover:border-[#22252F]/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">

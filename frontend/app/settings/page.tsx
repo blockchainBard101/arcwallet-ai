@@ -26,6 +26,33 @@ export default function SettingsPage() {
   const [telegramAlerts, setTelegramAlerts] = useState(false);
   const [pushAlerts, setPushAlerts] = useState(true);
 
+  // Subscription State
+  const { getAccessToken } = usePrivy();
+  const [subscription, setSubscription] = useState<any>(null);
+  const [loadingSub, setLoadingSub] = useState(true);
+
+  React.useEffect(() => {
+    const fetchSub = async () => {
+      try {
+        const token = await getAccessToken();
+        const res = await fetch("http://localhost:3001/subscription", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSubscription(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch subscription:", err);
+      } finally {
+        setLoadingSub(false);
+      }
+    };
+    if (activeTab === "subscription") {
+      fetchSub();
+    }
+  }, [activeTab, getAccessToken]);
+
   const handleSaveSecurity = (e: React.FormEvent) => {
     e.preventDefault();
     triggerToast("Security guardrails updated successfully!", "success");
@@ -41,6 +68,7 @@ export default function SettingsPage() {
     { id: "wallets", label: "Wallet Nodes", icon: Wallet },
     { id: "notifications", label: "Notification Channels", icon: Bell },
     { id: "security", label: "Security Guardrails", icon: Shield },
+    { id: "subscription", label: "Billing & Plans", icon: CreditCard },
   ];
 
   return (
@@ -299,6 +327,75 @@ export default function SettingsPage() {
                 Save Security Policies
               </button>
             </form>
+          )}
+
+        </div>
+
+          {/* TAB 5: SUBSCRIPTION */}
+          {activeTab === "subscription" && (
+            <div className="flex flex-col gap-5 animate-slide-in">
+              <div className="flex flex-col gap-1 border-b border-[#22252F] pb-3">
+                <span className="text-sm font-bold text-white tracking-tight">Billing & Plans</span>
+                <span className="text-[10px] text-slate-500 font-mono">Manage your subscription tier, quotas, and nanopayment limits</span>
+              </div>
+
+              {loadingSub ? (
+                <div className="text-xs text-slate-400">Loading subscription data...</div>
+              ) : subscription ? (
+                <div className="flex flex-col gap-6">
+                  {/* Current Plan Overview */}
+                  <div className="p-5 rounded-xl border border-neon-blue/20 bg-[#090A0F] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-bold text-neon-blue uppercase tracking-widest">Current Plan</span>
+                      <span className="text-xl font-bold text-white capitalize">{subscription.tier} Tier</span>
+                      <span className="text-[10px] text-slate-400">Cycle ends {new Date(subscription.currentPeriodEnd).toLocaleDateString()}</span>
+                    </div>
+                    {subscription.tier === "free" && (
+                      <button 
+                        onClick={() => router.push("/pricing")}
+                        className="px-4 py-2 rounded-xl bg-neon-blue text-slate-950 font-bold text-xs flex items-center gap-2 cursor-pointer hover:opacity-90"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Upgrade to Pro
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Usage Stats */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl border border-[#22252F] bg-[#090A0F]/50 flex flex-col gap-2">
+                      <span className="text-xs font-bold text-slate-300">LLM Operations Used</span>
+                      <div className="flex items-end gap-2">
+                        <span className="text-2xl font-bold text-white font-mono">{subscription.llmCallsUsed}</span>
+                        <span className="text-xs text-slate-500 font-mono pb-1">/ {subscription.tier === "free" ? 50 : subscription.tier === "pro" ? 500 : "∞"} calls</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#22252F] rounded-full overflow-hidden mt-1">
+                        <div 
+                          className="h-full bg-neon-blue rounded-full" 
+                          style={{ width: `${Math.min(100, (subscription.llmCallsUsed / (subscription.tier === "free" ? 50 : 500)) * 100)}%` }} 
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 rounded-xl border border-[#22252F] bg-[#090A0F]/50 flex flex-col gap-2">
+                      <span className="text-xs font-bold text-slate-300">Nanopayments Used</span>
+                      <div className="flex items-end gap-2">
+                        <span className="text-2xl font-bold text-white font-mono">${subscription.nanopayUsed?.toFixed(2)}</span>
+                        <span className="text-xs text-slate-500 font-mono pb-1">/ ${subscription.tier === "free" ? "0.00" : subscription.tier === "pro" ? "5.00" : "∞"} limit</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#22252F] rounded-full overflow-hidden mt-1">
+                        <div 
+                          className="h-full bg-emerald-400 rounded-full" 
+                          style={{ width: `${Math.min(100, (subscription.nanopayUsed / (subscription.tier === "free" ? 0.0001 : 5)) * 100)}%` }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-rose-400">Failed to load subscription data.</div>
+              )}
+            </div>
           )}
 
         </div>

@@ -49,7 +49,7 @@ export default function Sidebar() {
             <span className="font-extrabold text-slate-950 text-lg tracking-wider">A</span>
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-white text-base tracking-tight">ArcWallet</span>
+            <span className="font-bold text-white text-base tracking-tight">BlockGENT</span>
             <span className="text-[10px] text-neon-cyan font-mono tracking-widest font-semibold uppercase">Circle Stack</span>
           </div>
         </Link>
@@ -135,6 +135,14 @@ export default function Sidebar() {
           className="w-full py-2 px-3 rounded-lg bg-neon-blue text-slate-950 font-bold text-xs transition-all duration-300 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] cursor-pointer z-10"
         >
           Manage AI Agents
+        </button>
+
+        <button
+          onClick={() => router.push("/pricing")}
+          className="w-full py-2 px-3 rounded-lg border border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10 font-bold text-xs transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer z-10 flex items-center justify-center gap-2"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          Upgrade to Pro
         </button>
       </div>
     </aside>

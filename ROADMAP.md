@@ -1,8 +1,8 @@
-# ArcWallet AI - Backend Development Roadmap
+# BlockGENT - Backend Development Roadmap
 
-Welcome to the backend engineering phase of **ArcWallet AI**! Now that the frontend foundation is established, the next stage is constructing a robust, high-performance, and secure **NestJS backend**. This backend acts as the orchestrator between human intent (Privy embedded wallets), autonomous execution (Circle Agent Wallets), visual blockchain analytics (Arc Testnet RPC & Indexers), and LLM-driven intelligence.
+Welcome to the backend engineering phase of **BlockGENT**! Now that the frontend foundation is established, the next stage is constructing a robust, high-performance, and secure **NestJS backend**. This backend acts as the orchestrator between human intent (Privy embedded wallets), autonomous execution (Circle Agent Wallets), visual blockchain analytics (Arc Testnet RPC & Indexers), and LLM-driven intelligence.
 
-Below is the complete architectural blueprint and chronological implementation roadmap to take ArcWallet AI from a fresh NestJS scaffold to a fully functional production-ready MVP.
+Below is the complete architectural blueprint and chronological implementation roadmap to take BlockGENT from a fresh NestJS scaffold to a fully functional production-ready MVP.
 
 ---
 

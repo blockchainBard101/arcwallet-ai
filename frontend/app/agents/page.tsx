@@ -15,8 +15,8 @@ const LLM_PROVIDERS = [
 const RULE_TEMPLATES = [
   { icon: TrendingDown, label: "Stop-loss",   text: "If my USDC balance drops below 100, pause all swaps and alert me immediately." },
   { icon: RefreshCw,    label: "Auto-compound", text: "Every 24 hours, reinvest any yield above 5 USDC back into the highest-APY pool." },
-  { icon: Zap,          label: "Swap trigger", text: "Swap 50 USDC to ARC whenever my USDC balance exceeds 1,000 USDC." },
-  { icon: Bell,         label: "Price alert",  text: "Alert me when ARC price drops more than 15% in a single hour." },
+  { icon: Zap,          label: "Swap trigger", text: "Swap 50 USDC to EURC whenever my USDC balance exceeds 1,000 USDC." },
+  { icon: Bell,         label: "Price alert",  text: "Alert me when EURC price drops more than 15% in a single hour." },
 ];
 
 export default function AgentsPage() {
@@ -75,7 +75,7 @@ export default function AgentsPage() {
         <MetricCard
           label="Total Agent Assets"
           value={`$${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-          subtext="USDC/ARC in Circle wallets"
+          subtext="USDC/EURC in Circle wallets"
           sparklineData={[1800, 1920, 2050, 2180, 2292]}
         />
         <MetricCard

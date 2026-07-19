@@ -6,6 +6,7 @@ import { CircleService } from '../circle/circle.service';
 import { CORE_TOOLS } from './tools/registry';
 import { executeTool } from './tools/handlers';
 import { TransactionService } from '../transaction/transaction.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 // ──────────────────────────────────────────────────────────
 // Provider config resolved from agent.configuration in DB
@@ -26,7 +27,7 @@ const PROVIDER_MODELS: Record<AgentLlmConfig['provider'], string> = {
 
 const GROK_BASE_URL = 'https://api.x.ai/v1';
 
-const BASE_SYSTEM_PROMPT = `You are ArcAgent, an intelligent AI wallet assistant for ArcWallet AI — a DeFi automation platform on the Arc blockchain where USDC is the native gas token.
+const BASE_SYSTEM_PROMPT = `You are ArcAgent, an intelligent AI wallet assistant for BlockGENT — a DeFi automation platform on the Arc blockchain where USDC is the native gas token.
 
 You help users:
 - Check their Circle agent wallet balances and on-chain activity
@@ -78,6 +79,7 @@ export class LlmService {
     private readonly prisma: PrismaService,
     private readonly circle: CircleService,
     private readonly transactionService: TransactionService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   // ──────────────────────────────────────────────────────────
@@ -90,6 +92,9 @@ export class LlmService {
     sessionId?: string,
     agentId?: string,
   ): Promise<ChatResponse> {
+    // 0. Enforce subscription LLM limits
+    await this.subscriptionService.checkLlmLimit(userId);
+
     // 1. Resolve agent LLM config from DB (provider + user's API key)
     const llmConfig = await this.resolveLlmConfig(userId, agentId);
 
@@ -111,10 +116,11 @@ export class LlmService {
         ? await this.runAnthropicLoop(history, userMessage, userId, llmConfig, systemPrompt)
         : await this.runOpenAILoop(history, userMessage, userId, llmConfig, systemPrompt);
 
-    // 6. Persist assistant reply
+    // 6. Persist assistant reply and update limits
     await this.prisma.chatMessage.create({
       data: { sessionId: session.id, role: 'assistant', content: finalText },
     });
+    await this.subscriptionService.incrementLlmUsage(userId);
 
     // 7. Prune to rolling window
     await this.pruneHistory(session.id);
@@ -239,7 +245,7 @@ export class LlmService {
           const result = await executeTool(
             tool.name,
             tool.input as Record<string, any>,
-            { userId, prisma: this.prisma, circle: this.circle, transactionService: this.transactionService },
+            { userId, prisma: this.prisma, circle: this.circle, transactionService: this.transactionService, subscriptionService: this.subscriptionService },
           );
           this.enrichStructuredData(tool.name, result, structuredData);
           toolResults.push({ type: 'tool_result', tool_use_id: tool.id, content: result });
@@ -325,6 +331,7 @@ export class LlmService {
             prisma: this.prisma,
             circle: this.circle,
             transactionService: this.transactionService,
+            subscriptionService: this.subscriptionService,
           });
           this.enrichStructuredData(name, result, structuredData);
 

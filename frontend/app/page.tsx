@@ -14,7 +14,7 @@ export default function LandingPage() {
   const [demoChat, setDemoChat] = useState<Array<{ sender: "user" | "agent"; text: string; hasData?: boolean; type?: string }>>([
     {
       sender: "agent",
-      text: "Hello! I am ArcWallet AI. I can analyze any wallet on the Arc blockchain or help you configure autonomous trading agents using the Circle stack. Ask me anything!",
+      text: "Hello! I am BlockGENT. I can analyze any wallet on the Arc blockchain or help you configure autonomous trading agents using the Circle stack. Ask me anything!",
     },
   ]);
 
@@ -69,7 +69,7 @@ export default function LandingPage() {
 
   const chips = [
     "Analyze wallet 0x71C7...976F",
-    "Auto-buy ARC if price drops below $0.40",
+    "Auto-buy EURC if price drops below $1.05",
     "Show USDC bridge volume this week",
   ];
 
@@ -85,7 +85,7 @@ export default function LandingPage() {
           <div className="w-9 h-9 rounded-xl bg-neon-blue flex items-center justify-center">
             <span className="font-extrabold text-slate-950 text-lg tracking-wider">A</span>
           </div>
-          <span className="font-bold text-white text-base tracking-tight">ArcWallet <span className="text-neon-cyan text-xs">AI</span></span>
+          <span className="font-bold text-white text-base tracking-tight">BlockGENT <span className="text-neon-cyan text-xs">AI</span></span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-400">
@@ -144,7 +144,7 @@ export default function LandingPage() {
           <div className="h-14 border-b border-[#22252F] bg-[#090A0F]/80 px-4 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-2.5 h-2.5 rounded-full bg-neon-cyan animate-pulse" />
-              <span className="text-xs font-bold text-white">ArcWallet AI Sandbox</span>
+              <span className="text-xs font-bold text-white">BlockGENT Sandbox</span>
             </div>
             <div className="text-[10px] text-slate-500 font-mono">Simulated LLM Terminal</div>
           </div>
@@ -209,7 +209,7 @@ export default function LandingPage() {
                         <div className="w-10 h-10 rounded-full border-[6px] border-neon-blue border-r-neon-cyan border-b-neon-purple shrink-0" />
                         <div className="flex flex-col text-[11px]">
                           <span className="text-white font-bold">USDC Swaps: 70%</span>
-                          <span className="text-slate-400">ARC Swaps: 30%</span>
+                          <span className="text-slate-400">EURC Swaps: 30%</span>
                         </div>
                       </div>
                     </div>
@@ -219,8 +219,8 @@ export default function LandingPage() {
                     <div className="glass-panel p-3.5 border-[#22252F] bg-[#15161C] max-w-sm flex flex-col gap-3 animate-slide-in">
                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Rule Definition</div>
                       <div className="flex flex-col gap-1 text-[11px] leading-relaxed">
-                        <div className="text-white font-medium"><span className="text-neon-blue">IF:</span> ARC price drops below 0.40 USDC</div>
-                        <div className="text-white font-medium"><span className="text-neon-cyan">ACTION:</span> Buy 200 ARC from primary wallet</div>
+                        <div className="text-white font-medium"><span className="text-neon-blue">IF:</span> EURC price drops below 1.05 USDC</div>
+                        <div className="text-white font-medium"><span className="text-neon-cyan">ACTION:</span> Buy 200 EURC from primary wallet</div>
                         <div className="text-slate-500 font-mono text-[9px]">Slippage protection limit: 1%</div>
                       </div>
                       <button
@@ -326,7 +326,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="mt-auto border-t border-[#22252F] bg-[#090A0F] py-8 text-center text-xs text-slate-500 z-10">
         <div className="max-w-[1200px] w-full mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <span>&copy; 2026 ArcWallet AI. All rights reserved.</span>
+          <span>&copy; 2026 BlockGENT. All rights reserved.</span>
           <div className="flex gap-6 font-semibold">
             <a href="#" className="hover:text-slate-300">Docs</a>
             <a href="#" className="hover:text-slate-300">GitHub</a>

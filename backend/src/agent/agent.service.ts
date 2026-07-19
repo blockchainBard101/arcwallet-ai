@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CircleService } from '../circle/circle.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 @Injectable()
 export class AgentService {
@@ -9,6 +10,7 @@ export class AgentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly circleService: CircleService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   /**
@@ -21,6 +23,9 @@ export class AgentService {
   async createAgent(userId: string, name: string, configuration: any) {
     try {
       this.logger.log(`Provisioning Agent "${name}" for User: ${userId}`);
+
+      // 0. Enforce subscription agent limits
+      await this.subscriptionService.checkAgentLimit(userId);
 
       // 1. Create a WalletSet in Circle
       const walletSetName = `Agent-${name.replace(/\s+/g, '-')}-${Date.now()}`;

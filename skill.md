@@ -1,10 +1,10 @@
-# ArcWallet AI - Skills Registry
+# BlockGENT - Skills Registry
 
 **Version:** 1.0 (MVP)  
 **Last Updated:** May 21, 2026  
 **Platform:** Arc + Circle Agent Stack
 
-This document defines all core skills available to the ArcWallet AI Personal Wallet Agent.
+This document defines all core skills available to the BlockGENT Personal Wallet Agent.
 
 ---
 

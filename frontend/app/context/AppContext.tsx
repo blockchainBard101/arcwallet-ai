@@ -16,7 +16,7 @@ export const getBackendUrl = () => {
 export interface Wallet {
   address: string;
   balanceUSDC: number;
-  balanceARC: number;
+  balanceEURC: number;
   connected: boolean;
   type: string;
 }
@@ -102,6 +102,7 @@ interface AppContextType {
   deleteAlert: (id: string) => void;
   clearChat: (chatId: string) => void;
   recentExplorations: string[];
+  showUpgradeModal: (title: string, message: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -127,7 +128,7 @@ const INITIAL_AGENTS: Agent[] = [
     status: "idle",
     wallet: "0xArcAgent2B3yQ2fR6r88bc",
     balance: 842.15,
-    token: "ARC",
+    token: "EURC",
     created: "2026-05-15",
     rulesCount: 1,
     successRate: 100,
@@ -139,9 +140,9 @@ const INITIAL_RULES: Record<string, Rule[]> = {
   "agent-1": [
     {
       id: "rule-1",
-      text: "If USDC balance is greater than 1000, swap 100 USDC to ARC weekly.",
+      text: "If USDC balance is greater than 1000, swap 100 USDC to EURC weekly.",
       trigger: "Balance (> 1000 USDC)",
-      action: "Swap 100 USDC to ARC",
+      action: "Swap 100 USDC to EURC",
       active: true,
       lastTriggered: "2026-05-20 14:32",
     },
@@ -155,7 +156,7 @@ const INITIAL_RULES: Record<string, Rule[]> = {
     },
     {
       id: "rule-3",
-      text: "Auto-rebalance portfolio to 80% USDC and 20% ARC every Sunday at 00:00 UTC.",
+      text: "Auto-rebalance portfolio to 80% USDC and 20% EURC every Sunday at 00:00 UTC.",
       trigger: "Scheduled (Weekly)",
       action: "Rebalance Portfolio",
       active: false,
@@ -165,9 +166,9 @@ const INITIAL_RULES: Record<string, Rule[]> = {
   "agent-2": [
     {
       id: "rule-4",
-      text: "If price of ARC drops below 0.40 USDC, auto-buy 200 ARC with USDC from agent wallet.",
-      trigger: "Price (ARC < 0.40 USDC)",
-      action: "Buy 200 ARC",
+      text: "If price of EURC drops below 1.05 USDC, auto-buy 200 EURC with USDC from agent wallet.",
+      trigger: "Price (EURC < 1.05 USDC)",
+      action: "Buy 200 EURC",
       active: true,
       lastTriggered: "Never",
     },
@@ -196,7 +197,7 @@ const INITIAL_CHATS: Record<string, ChatMessage[]> = {
     {
       id: "m-1",
       sender: "agent",
-      text: "Welcome to ArcWallet AI's Public Intelligence Explorer! You can scan any wallet address on the Arc blockchain or ask about recent onchain activities. Try typing a wallet address or selecting a prompt chip below.",
+      text: "Welcome to BlockGENT's Public Intelligence Explorer! You can scan any wallet address on the Arc blockchain or ask about recent onchain activities. Try typing a wallet address or selecting a prompt chip below.",
       timestamp: "15:10",
     },
   ],
@@ -223,7 +224,7 @@ const INITIAL_ACTIVITY: Activity[] = [
     id: "act-1",
     type: "rule_trigger",
     title: "Rule Executed: Auto-Reinvest",
-    description: "Yield Harvester swapped 100 USDC for 204.5 ARC successfully.",
+    description: "Yield Harvester swapped 100 USDC for 92.5 EURC successfully.",
     wallet: "0xArcAgent1A2zP1eP5q77ab",
     status: "success",
     value: "100.00 USDC",
@@ -233,7 +234,7 @@ const INITIAL_ACTIVITY: Activity[] = [
     id: "act-2",
     type: "swap",
     title: "Portfolio Swap",
-    description: "Swapped 500 USDC for 1,020 ARC.",
+    description: "Swapped 500 USDC for 462 EURC.",
     wallet: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
     status: "success",
     value: "500.00 USDC",
@@ -260,10 +261,16 @@ const INITIAL_ACTIVITY: Activity[] = [
   },
 ];
 
+import { UpgradeModal } from "../components/UpgradeModal";
+
 export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
   const [explorerWallet, setExplorerWallet] = useState<string>("0x71C7656EC7ab88b098defB751B7401B5f6d8976F");
   const [recentExplorations, setRecentExplorations] = useState<string[]>([]);
+  const [upgradeModal, setUpgradeModal] = useState({ isOpen: false, title: "", message: "" });
+  
+  const showUpgradeModal = (title: string, message: string) => setUpgradeModal({ isOpen: true, title, message });
+  const hideUpgradeModal = () => setUpgradeModal(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -294,7 +301,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
         return {
           address,
           balanceUSDC: 0,
-          balanceARC: 0,
+          balanceEURC: 0,
           connected: true,
           type: (activeWallet as any).wallet_client_type === "privy" || (activeWallet as any).walletClientType === "privy" || (activeWallet as any).connector_type === "embedded" || (activeWallet as any).connectorType === "embedded" ? "Privy Embedded" : "MetaMask",
         };
@@ -359,7 +366,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
           setConnectedWallet({
             address,
             balanceUSDC: nativeBalance || erc20Balance,
-            balanceARC: 0,
+            balanceEURC: 0,
             connected: true,
             type: (activeWallet as any).wallet_client_type === "privy" || (activeWallet as any).walletClientType === "privy" || (activeWallet as any).connector_type === "embedded" || (activeWallet as any).connectorType === "embedded" ? "Privy Embedded" : "MetaMask",
           });
@@ -422,7 +429,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("arcai_chats");
+      const stored = localStorage.getItem("blockgent_chats");
       if (stored) {
         try {
           setChats(JSON.parse(stored));
@@ -435,7 +442,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
 
   useEffect(() => {
     if (typeof window !== "undefined" && chats !== INITIAL_CHATS) {
-      localStorage.setItem("arcai_chats", JSON.stringify(chats));
+      localStorage.setItem("blockgent_chats", JSON.stringify(chats));
     }
   }, [chats]);
   const [activityLog, setActivityLog] = useState<Activity[]>(INITIAL_ACTIVITY);
@@ -449,7 +456,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
     setConnectedWallet({
       address: defaultAddress,
       balanceUSDC: 12531.79,
-      balanceARC: 842.15,
+      balanceEURC: 842.15,
       connected: true,
       type: "MetaMask",
     });
@@ -591,7 +598,11 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
       return a.id;
     } catch (err: any) {
       console.error("Failed to deploy agent wallet:", err);
-      triggerToast(`Deployment failed: ${err.message}`, "error");
+      if (err.message?.toLowerCase().includes("limit") || err.message?.toLowerCase().includes("upgrade")) {
+        showUpgradeModal("Agent Limit Reached", err.message);
+      } else {
+        triggerToast(`Deployment failed: ${err.message}`, "error");
+      }
       return "";
     }
   };
@@ -768,9 +779,16 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
         deleteAlert,
         clearChat,
         recentExplorations,
+        showUpgradeModal,
       }}
     >
       {children}
+      <UpgradeModal 
+        isOpen={upgradeModal.isOpen} 
+        onClose={hideUpgradeModal} 
+        title={upgradeModal.title} 
+        message={upgradeModal.message} 
+      />
     </AppContext.Provider>
   );
 };

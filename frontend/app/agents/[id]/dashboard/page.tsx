@@ -67,7 +67,7 @@ export default function AgentDashboardPage({ params }: PageProps) {
       id: `act-1-${id}`,
       type: "rule_trigger",
       title: "Rule Executed: Auto-Reinvest",
-      description: `${agent.name} swapped 100 USDC for 204.5 ARC successfully.`,
+      description: `${agent.name} swapped 100 USDC for 92.5 EURC successfully.`,
       wallet: agent.wallet,
       status: "success",
       value: "100.00 USDC",
@@ -77,7 +77,7 @@ export default function AgentDashboardPage({ params }: PageProps) {
       id: `act-2-${id}`,
       type: "swap",
       title: "Sandbox Swap",
-      description: `Swapped 50 USDC for 102.5 ARC.`,
+      description: `Swapped 50 USDC for 46.2 EURC.`,
       wallet: agent.wallet,
       status: "success",
       value: "50.00 USDC",
@@ -198,7 +198,7 @@ export default function AgentDashboardPage({ params }: PageProps) {
         />
         <MetricCard
           label="Gas Spent (Sandbox)"
-          value={`${agent.gasSpent} ARC`}
+          value={`${agent.gasSpent} USDC`}
           subtext="Mock L1 RPC execution cost"
           sparklineData={[0.2, 0.45, 0.6, 0.95, 1.25]}
         />

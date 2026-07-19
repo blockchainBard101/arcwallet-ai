@@ -78,7 +78,7 @@ export default function OnboardingPage() {
             </div>
             
             <div className="flex flex-col gap-2">
-              <h2 className="text-xl font-extrabold text-white tracking-tight">Welcome to ArcWallet AI</h2>
+              <h2 className="text-xl font-extrabold text-white tracking-tight">Welcome to BlockGENT</h2>
               <p className="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
                 Connect your account to deploy your secure AI workspace. We will provision your human signer wallet and link your dedicated Circle autonomous agents.
               </p>

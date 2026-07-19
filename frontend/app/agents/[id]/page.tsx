@@ -44,6 +44,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
     addChatMessage,
     setAgentChats,
     triggerToast,
+    showUpgradeModal,
   } = useApp();
 
   const { getAccessToken, authenticated, ready } = usePrivy();
@@ -219,7 +220,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
         if (randomRule.active) {
           randomLogs.push(
             `[TRIGGER] [${timestamp}] Rule "${randomRule.trigger}" condition evaluated to TRUE.`,
-            `[SIMULATE] [${timestamp}] Executed visual compiler test. Result: SUCCESS. Gas simulation: 0.003 ARC.`
+            `[SIMULATE] [${timestamp}] Executed visual compiler test. Result: SUCCESS. Gas simulation: 0.003 USDC.`
           );
         } else {
           randomLogs.push(`[MONITOR] [${timestamp}] Rule [${randomRule.id}] is inactive. Skipping check.`);
@@ -318,7 +319,12 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        addChatMessage(id, `⚠️ ${err.message || 'The agent returned an error. Check your API key in agent settings.'}`, "agent");
+        if (err.message?.toLowerCase().includes("limit") || err.message?.toLowerCase().includes("budget") || err.message?.toLowerCase().includes("exceeds")) {
+          addChatMessage(id, `⚠️ Error: ${err.message}`, "agent");
+          showUpgradeModal("Quota Exceeded", err.message);
+        } else {
+          addChatMessage(id, `⚠️ ${err.message || 'The agent returned an error. Check your API key in agent settings.'}`, "agent");
+        }
         return;
       }
 
@@ -430,7 +436,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
         return;
       }
 
-      if (activeWallet.chainId !== `eip155:${ARC_CHAIN_ID}` && activeWallet.chainId !== String(ARC_CHAIN_ID) && activeWallet.chainId !== ARC_CHAIN_ID) {
+      if (activeWallet.chainId !== `eip155:${ARC_CHAIN_ID}` && activeWallet.chainId !== String(ARC_CHAIN_ID)) {
         triggerToast("Switching network to Arc Testnet...", "info");
         await activeWallet.switchChain(ARC_CHAIN_ID);
       }
@@ -531,7 +537,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
   const suggestionChips = [
     "Simulate portfolio rebalance",
-    "Swap 50 USDC for ARC",
+    "Swap 50 USDC for EURC",
     "Show active rules logs",
     "Check Circle vault balance",
   ];
@@ -856,7 +862,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
             <div className="p-3.5 rounded-xl bg-[#090A0F]/40 border border-[#22252F] flex flex-col gap-0.5">
               <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Gas spent (sandbox)</span>
               <span className="text-sm font-extrabold text-neon-purple font-mono">
-                {agent.gasSpent} ARC
+                {agent.gasSpent} USDC
               </span>
             </div>
           </div>

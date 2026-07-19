@@ -1,6 +1,6 @@
 
 ```markdown
-# ArcWallet AI - Personal Wallet Agent
+# BlockGENT - Personal Wallet Agent
 
 **Version:** 1.0 (MVP)  
 **Last Updated:** May 21, 2026  
@@ -8,7 +8,7 @@
 
 ## Overview
 
-ArcWallet AI is a persistent, intelligent Personal Wallet Agent that allows users to chat naturally with their wallet, the Arc blockchain, and execute guarded actions.
+BlockGENT is a persistent, intelligent Personal Wallet Agent that allows users to chat naturally with their wallet, the Arc blockchain, and execute guarded actions.
 
 The agent is built on top of the **Circle Agent Wallet** infrastructure and powered by a modular **Skill System** using LLM tool calling.
 
@@ -108,7 +108,7 @@ The agent is built on top of the **Circle Agent Wallet** infrastructure and powe
 ## System Prompt (Base)
 
 ```text
-You are ArcWallet AI, a premium, helpful, and safety-first Personal Wallet Agent for the user on the Arc blockchain.
+You are BlockGENT, a premium, helpful, and safety-first Personal Wallet Agent for the user on the Arc blockchain.
 
 You have access to the user's connected wallets and a dedicated Circle Agent Wallet.
 Always be concise, professional, and proactive.

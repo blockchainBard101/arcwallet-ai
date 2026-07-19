@@ -1,11 +1,26 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 /**
- * Core tool registry for the ArcWallet AI agent.
+ * Core tool registry for the BlockGENT agent.
  * Each tool maps to a handler in handlers.ts.
  * Claude 3.5 Sonnet will select and call these based on the user's prompt.
  */
 export const CORE_TOOLS: Anthropic.Tool[] = [
+  {
+    name: 'analyze_transaction',
+    description:
+      'Analyze an EVM blockchain transaction given its transaction hash. Fetches raw transaction data, receipt, and attempts to decode standard ERC-20 token events (Transfer, Approval) into plain English explanations.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        txHash: {
+          type: 'string',
+          description: 'The 0x-prefixed transaction hash to analyze.',
+        },
+      },
+      required: ['txHash'],
+    },
+  },
   {
     name: 'get_wallet_balance',
     description:
@@ -180,5 +195,299 @@ export const CORE_TOOLS: Anthropic.Tool[] = [
       required: ['fromAgentId', 'destinationChain', 'recipientAddress', 'amountUsdc'],
     },
   },
+  {
+    name: 'create_rule',
+    description:
+      'Create a new automation rule for an agent. Use when the user says "add a rule", "create a rule", "set up a rule", or similar condition (e.g., "if balance drops below X, transfer Y to Z"). The rule triggers automatically when conditions are met.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          description: 'The database ID of the agent to attach the rule to.',
+        },
+        naturalRuleText: {
+          type: 'string',
+          description: 'The raw natural language text of the rule.',
+        },
+        trigger: {
+          type: 'object',
+          description: 'The trigger condition config.',
+          properties: {
+            type: { type: 'string', enum: ['balance'], description: 'The type of trigger.' },
+            token: { type: 'string', description: 'Token symbol to monitor (e.g. USDC).' },
+            operator: { type: 'string', enum: ['below', 'above'], description: 'Comparison operator.' },
+            value: { type: 'number', description: 'Threshold value.' },
+          },
+          required: ['type', 'token', 'operator', 'value'],
+        },
+        action: {
+          type: 'object',
+          description: 'The action config to execute when triggered.',
+          properties: {
+            type: { type: 'string', enum: ['transfer'], description: 'Type of action.' },
+            amount: { type: 'number', description: 'Amount of tokens to move.' },
+            to: { type: 'string', description: 'Recipient wallet address (0x...).' },
+          },
+          required: ['type', 'amount', 'to'],
+        },
+      },
+      required: ['agentId', 'naturalRuleText', 'trigger', 'action'],
+    },
+  },
+  {
+    name: 'list_rules',
+    description:
+      'List all automation rules associated with a specific agent. Use when the user asks "what rules are set up", "show rules", "list my rules", or wants to see current automations.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          description: 'The database ID of the agent whose rules to retrieve.',
+        },
+      },
+      required: ['agentId'],
+    },
+  },
+  {
+    name: 'delete_rule',
+    description:
+      'Delete or cancel a specific automation rule using its rule ID. Use when the user says "delete rule X", "cancel rule Y", "remove this rule", or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ruleId: {
+          type: 'string',
+          description: 'The database ID of the rule to delete.',
+        },
+      },
+      required: ['ruleId'],
+    },
+  },
+  {
+    name: 'set_alert',
+    description:
+      'Create a new alert/notification monitor for the user. Use when the user says "set an alert when...", "notify me when...", "warn me if...", or similar conditions (e.g. notify if gas exceeds 50 gwei, alert if balance drops below 10 USDC).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['balance', 'volume', 'custom'],
+          description: 'The type of alert to set.',
+        },
+        condition: {
+          type: 'object',
+          description: 'The monitoring condition configuration.',
+          properties: {
+            token: { type: 'string', description: 'Token symbol if monitoring balance/volume (e.g. USDC).' },
+            operator: { type: 'string', enum: ['below', 'above'], description: 'Comparison operator.' },
+            value: { type: 'number', description: 'Threshold value.' },
+            customDescription: { type: 'string', description: 'Detailed text for custom alerts (e.g. "gas price exceeds 50 Gwei").' },
+          },
+          required: [],
+        },
+      },
+      required: ['type', 'condition'],
+    },
+  },
+  {
+    name: 'list_active_alerts',
+    description:
+      'List all active alerts and notifications configured by the user. Use when the user asks "what alerts do I have set up", "show active alerts", "list my alerts", or wants to see current monitoring criteria.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'delete_alert',
+    description:
+      'Delete or cancel a specific alert using its alert ID. Use when the user says "delete alert X", "remove alert Y", "dismiss notification rule", or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        alertId: {
+          type: 'string',
+          description: 'The database ID of the alert to delete.',
+        },
+      },
+      required: ['alertId'],
+    },
+  },
+  {
+    name: 'find_yield_opportunities',
+    description:
+      'Scan and identify high-yield investment opportunities for USDC/EURC stablecoins on the Arc L1 network (e.g. liquidity pools, lending markets). Use when the user asks "where can I get yield", "show yield opportunities", "find pools", or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'deposit_to_yield_pool',
+    description:
+      'Deposit USDC into a specified DeFi yield pool on the Arc L1 network. Use this when the user explicitly asks to "deposit into ArcLend", "supply USDC to yield pool", or similar actions to earn yield.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          description: 'The database ID of the agent whose wallet will supply the USDC.',
+        },
+        poolName: {
+          type: 'string',
+          description: 'The name of the pool to deposit into (e.g., "ArcLend USDC Core").',
+        },
+        amountUsdc: {
+          type: 'number',
+          description: 'Amount of USDC to deposit.',
+        },
+      },
+      required: ['agentId', 'poolName', 'amountUsdc'],
+    },
+  },
+  {
+    name: 'rebalance_portfolio',
+    description:
+      'Rebalance the assets held in an agent\'s vault wallet according to target percentage splits (e.g. rebalance to 70% USDC and 30% EURC). Use when the user says "rebalance", "change my portfolio split", "set target allocation", or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          description: 'The database ID of the agent whose vault should be rebalanced.',
+        },
+        targetAllocation: {
+          type: 'object',
+          description: 'The target token percentage split, mapping token symbols (e.g. USDC, EURC) to integer percent values (e.g. {"USDC": 70, "EURC": 30}). The total sum of percentages must be 100.',
+          additionalProperties: { type: 'number' },
+        },
+      },
+      required: ['agentId', 'targetAllocation'],
+    },
+  },
+  {
+    name: 'get_token_info',
+    description:
+      'Look up detailed metadata information for a specific token symbol on the Arc blockchain network. Use when the user asks "what is token X", "tell me about EURC contract", "token address for USDC", or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        symbol: {
+          type: 'string',
+          description: 'The token symbol to look up (e.g. USDC, EURC).',
+        },
+      },
+      required: ['symbol'],
+    },
+  },
+  {
+    name: 'analyze_contract',
+    description:
+      'Analyze the smart contract byte-code or status of a specific 0x contract address. Determines if a given address is a smart contract, checks its deployment status, and provides a security/operational report. Use when the user asks "analyze contract X", "is Y a contract", "what is deployed at address Z", or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        contractAddress: {
+          type: 'string',
+          description: 'The 0x EVM contract address to verify and analyze.',
+        },
+      },
+      required: ['contractAddress'],
+    },
+  },
+  {
+    name: 'get_spending_policy',
+    description:
+      'Retrieve the current on-chain spending policy caps (per-transaction, daily, weekly, monthly USDC limits) for a specific agent wallet. Use when the user asks "show spending limits", "what are my caps", "check spending policy", or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          description: 'The database ID of the agent whose spending policy to retrieve.',
+        },
+      },
+      required: ['agentId'],
+    },
+  },
+  {
+    name: 'set_spending_policy',
+    description:
+      'Generate the verbatim CLI command to configure USDC spending caps (per-transaction, daily, weekly, monthly) on an agent wallet. The agent NEVER executes this — it returns the command for the user to run themselves in their terminal because it requires OTP email confirmation. Use when the user asks to "set spending limit", "configure caps", "limit my agent wallet to X per day", or similar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          description: 'The database ID of the agent whose spending caps to configure.',
+        },
+        perTx: {
+          type: 'number',
+          description: 'Maximum USDC allowed per single transaction.',
+        },
+        daily: {
+          type: 'number',
+          description: 'Maximum USDC allowed per day.',
+        },
+        weekly: {
+          type: 'number',
+          description: 'Maximum USDC allowed per week.',
+        },
+        monthly: {
+          type: 'number',
+          description: 'Maximum USDC allowed per month.',
+        },
+      },
+      required: ['agentId'],
+    },
+  },
+  {
+    name: 'discover_paid_services',
+    description:
+      'Search Circle\'s x402 marketplace for paid API services by keyword. Returns service name, description, price per call, and supported chains. Use when the user wants to find a paid service to call ("find a web search service", "what crypto price services are available?", "search for weather APIs"), or before making a nanopay_call to discover the right endpoint.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        keyword: {
+          type: 'string',
+          description: 'Search term for the marketplace (e.g. "crypto", "web search", "weather", "news").',
+        },
+      },
+      required: ['keyword'],
+    },
+  },
+  {
+    name: 'nanopay_call',
+    description:
+      'Pay for and call a Circle x402 paid API endpoint using the agent\'s Circle wallet. Handles the full inspect → pay flow: inspects the endpoint to surface the per-call cost, pays in USDC from the agent wallet, and returns the response data. Use when the user wants to use a paid data service (crypto prices, web search, news, weather, etc.) or when free APIs are unavailable/rate-limited. Always search via discover_paid_services first if the exact service URL is not known.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agentId: {
+          type: 'string',
+          description: 'The database ID of the agent whose wallet will be charged.',
+        },
+        serviceUrl: {
+          type: 'string',
+          description: 'The full URL of the x402 paid API endpoint to call.',
+        },
+        chain: {
+          type: 'string',
+          description: 'The blockchain chain to pay from (e.g. "BASE", "MATIC", "ETH"). Defaults to BASE.',
+        },
+        data: {
+          type: 'object',
+          description: 'Optional JSON body/query parameters to send to the service endpoint.',
+        },
+      },
+      required: ['agentId', 'serviceUrl'],
+    },
+  },
 ];
+
 

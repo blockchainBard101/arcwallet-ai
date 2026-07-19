@@ -1,6 +1,6 @@
-# ArcWallet AI PRD
+# BlockGENT PRD
 
-**Product Name:** ArcWallet AI
+**Product Name:** BlockGENT
 
 **Version:** 1.0 MVP (Production-Ready / Architecture Revised)
 
@@ -12,7 +12,7 @@
 
 ### 1. Product Vision
 
-ArcWallet AI is a **premium, intuitive AI Agent Platform** native to **Arc** (Circle’s stablecoin-native L1 blockchain) and the **Circle Agent Stack**. It empowers users to interact naturally with wallets and the blockchain, create persistent Personal Wallet Agents powered by dedicated Circle Agent Wallets, and access rich visual analytics.
+BlockGENT is a **premium, intuitive AI Agent Platform** native to **Arc** (Circle’s stablecoin-native L1 blockchain) and the **Circle Agent Stack**. It empowers users to interact naturally with wallets and the blockchain, create persistent Personal Wallet Agents powered by dedicated Circle Agent Wallets, and access rich visual analytics.
 
 **Tagline:** *“Chat with your wallet. Command the chain. Own your AI agent.”*
 

@@ -433,12 +433,22 @@ export class AppService {
     }
     riskScore = Math.min(100, Math.max(0, riskScore));
 
+    // Idle Capital Detection
+    const idleCapitalDetected = erc20Balance > 500;
+    const idleCapitalAnalysis = idleCapitalDetected ? {
+      idleCapitalDetected: true,
+      idleAmountUsdc: erc20Balance,
+      missedAnnualYieldUsdc: (erc20Balance * 0.065).toFixed(2), // 6.5% APY
+      recommendation: "Migrate idle USDC to ArcLend for 6.5% APY."
+    } : { idleCapitalDetected: false };
+
     return {
       portfolioValue,
       totalVolumeTraded,
       transactionCount,
       uniqueDexPools,
       riskScore,
+      idleCapitalAnalysis,
       heatmap,
       transactions,
       charts: {

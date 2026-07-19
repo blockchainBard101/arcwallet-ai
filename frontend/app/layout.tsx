@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ArcWallet AI | Premium AI Agent Stack",
+  title: "BlockGENT | Premium AI Agent Stack",
   description: "Autonomous Personal Wallet Agents and analytics platform built on Arc blockchain & Circle Agent Stack.",
 };
 

@@ -9,7 +9,7 @@ import ReactMarkdown from "react-markdown";
 
 export default function ChatPage() {
   const router = useRouter();
-  const { chats, addChatMessage, searchWallet, clearChat, connectedWallet, recentExplorations, triggerToast, setAgentChats } = useApp();
+  const { chats, addChatMessage, searchWallet, clearChat, connectedWallet, recentExplorations, triggerToast, setAgentChats, showUpgradeModal } = useApp();
   const { getAccessToken, authenticated } = usePrivy();
   const { wallets } = useWallets();
   const [inputText, setInputText] = useState("");
@@ -39,7 +39,7 @@ export default function ChatPage() {
       }
 
       const ARC_CHAIN_ID = 5042002;
-      if (activeWallet.chainId !== `eip155:${ARC_CHAIN_ID}` && activeWallet.chainId !== String(ARC_CHAIN_ID) && activeWallet.chainId !== ARC_CHAIN_ID) {
+      if (activeWallet.chainId !== `eip155:${ARC_CHAIN_ID}` && activeWallet.chainId !== String(ARC_CHAIN_ID)) {
         triggerToast("Switching network to Arc Testnet...", "info");
         await activeWallet.switchChain(ARC_CHAIN_ID);
       }
@@ -195,7 +195,12 @@ export default function ChatPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        addChatMessage("public", `⚠️ Error: ${err.message || "The explorer agent is currently unavailable."}`, "agent");
+        if (err.message?.toLowerCase().includes("limit") || err.message?.toLowerCase().includes("budget") || err.message?.toLowerCase().includes("exceeds")) {
+          addChatMessage("public", `⚠️ Error: ${err.message}`, "agent");
+          showUpgradeModal("Quota Exceeded", err.message);
+        } else {
+          addChatMessage("public", `⚠️ Error: ${err.message || "The explorer agent is currently unavailable."}`, "agent");
+        }
         return;
       }
 
@@ -254,7 +259,7 @@ export default function ChatPage() {
                 type: "wallet_preview",
                 address: address,
                 balance: `${stats.portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`,
-                tokens: ["USDC", "ARC", "USDT"],
+                tokens: ["USDC", "EURC", "USDT"],
                 txCount: stats.transactionCount,
                 riskScore: stats.riskScore ?? 15,
               };
@@ -550,7 +555,7 @@ export default function ChatPage() {
                           }
                           
                           const ARC_CHAIN_ID = 5042002;
-                          if (activeWallet.chainId !== `eip155:${ARC_CHAIN_ID}` && activeWallet.chainId !== String(ARC_CHAIN_ID) && activeWallet.chainId !== ARC_CHAIN_ID) {
+                          if (activeWallet.chainId !== `eip155:${ARC_CHAIN_ID}` && activeWallet.chainId !== String(ARC_CHAIN_ID)) {
                             triggerToast("Switching network to Arc Testnet...", "info");
                             await activeWallet.switchChain(ARC_CHAIN_ID);
                           }

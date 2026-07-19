@@ -39,7 +39,7 @@ export default function AgentRulesConsole({ params }: PageProps) {
   const [conditionOperator, setConditionOperator] = useState(">");
   const [conditionValue, setConditionValue] = useState("1000");
   const [actionType, setActionType] = useState("Swap Assets");
-  const [actionDetail, setActionDetail] = useState("Swap 100 USDC to ARC");
+  const [actionDetail, setActionDetail] = useState("Swap 100 USDC to EURC");
 
   // NLP form states
   const [nlpText, setNlpText] = useState("");
@@ -99,11 +99,11 @@ export default function AgentRulesConsole({ params }: PageProps) {
       `[COMPILER] [0.05s] Token verification passed. Schema matches standard DSL.`,
       `[COMPILER] [0.12s] Target contract interfaces loaded: Circle Wallet Safe`,
       `[SIMULATION] [0.20s] Fetching mockup state from Arc RPC network...`,
-      `[SIMULATION] [0.35s] Wallet balance set to 1,500 USDC / 1,200 ARC.`,
+      `[SIMULATION] [0.35s] Wallet balance set to 1,500 USDC / 1,200 EURC.`,
       `[SIMULATION] [0.50s] Evaluating condition: ${trigger} => TRUE`,
       `[SIMULATION] [0.65s] Simulating Action: ${action} on Sandbox.`,
       `[SIMULATION] [0.80s] Executing mock router swap contract: ArcSwapRouter.sol`,
-      `[SIMULATION] [0.95s] Gas usage: 0.00315 ARC. Transaction status: SIM_SUCCESS`,
+      `[SIMULATION] [0.95s] Gas usage: 0.00315 USDC. Transaction status: SIM_SUCCESS`,
       `[SIMULATOR] Simulation completed successfully! The rule is safe to deploy.`,
     ]);
 
@@ -278,8 +278,8 @@ export default function AgentRulesConsole({ params }: PageProps) {
                       className="h-10 px-3 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
                     >
                       <option>USDC Balance</option>
-                      <option>ARC Balance</option>
-                      <option>ARC Oracle Price</option>
+                      <option>EURC Balance</option>
+                      <option>EURC Oracle Price</option>
                       <option>RPC Gas Limit</option>
                     </select>
                   </div>
@@ -346,7 +346,7 @@ export default function AgentRulesConsole({ params }: PageProps) {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Natural Language Script Prompt</label>
                   <textarea
-                    placeholder="e.g. If ARC price drops below 0.35 USDC, then auto-swap 150 USDC to buy ARC and alert my dashboard..."
+                    placeholder="e.g. If EURC price drops below 1.05 USDC, then auto-swap 150 USDC to buy EURC and alert my dashboard..."
                     value={nlpText}
                     onChange={(e) => setNlpText(e.target.value)}
                     className="p-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white min-h-[120px] focus:outline-none focus:border-neon-blue/50 leading-relaxed"
