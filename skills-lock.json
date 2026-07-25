@@ -19,6 +19,12 @@
       "skillPath": "plugins/circle/skills/fund-agent-wallet/SKILL.md",
       "computedHash": "e5b9ca3741487e8d78e021327bd2af829d47f48ff961a5dd34f4bf09c8dbb3c0"
     },
+    "hyperframes-animation": {
+      "source": "heygen-com/hyperframes",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-animation/SKILL.md",
+      "computedHash": "0c6bcf82e99f2f1cc788a47a8aefddac7dd19c81fb870e3199e3c41f2794c4b5"
+    },
     "pay-via-agent-wallet": {
       "source": "circlefin/skills",
       "sourceType": "github",
@@ -29,6 +35,12 @@
       "source": "docs.privy.io",
       "sourceType": "well-known",
       "computedHash": "f3a7e67a448cfe5ec09bb1b2deed43a84794e4098ddc016ebfe4ed6803edf48f"
+    },
+    "responsive-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/responsive-design/SKILL.md",
+      "computedHash": "794cc7f1b2f79d398135d19ef3fe32c406dde926b9bdf86ee3fe7b939a0be906"
     },
     "swap-tokens": {
       "source": "circlefin/skills",

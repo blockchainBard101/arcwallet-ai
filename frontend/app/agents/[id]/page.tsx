@@ -78,6 +78,8 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  // Mobile panel switcher: "chat" | "telemetry"
+  const [activePanel, setActivePanel] = useState<"chat" | "telemetry">("chat");
 
   const handleCopyMessage = (text: string, msgId: string) => {
     navigator.clipboard.writeText(text);
@@ -544,10 +546,36 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
   return (
     <>
+    {/* Mobile Panel Switcher — only visible on smaller screens */}
+    <div className="flex lg:hidden gap-2 mb-1">
+      <button
+        onClick={() => setActivePanel("chat")}
+        className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+          activePanel === "chat"
+            ? "bg-neon-blue/10 text-white border-neon-blue/30"
+            : "text-slate-400 border-[#22252F] bg-[#15161C] hover:text-slate-200"
+        }`}
+      >
+        💬 Agent Chat
+      </button>
+      <button
+        onClick={() => setActivePanel("telemetry")}
+        className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+          activePanel === "telemetry"
+            ? "bg-neon-blue/10 text-white border-neon-blue/30"
+            : "text-slate-400 border-[#22252F] bg-[#15161C] hover:text-slate-200"
+        }`}
+      >
+        📡 Telemetry
+      </button>
+    </div>
+
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 select-none h-full relative">
       
       {/* LEFT SIDE: Chat Workspace */}
-      <div className="lg:col-span-7 flex flex-col h-[calc(100vh-130px)] min-h-[500px] glass-panel border-[#22252F] bg-[#15161C] overflow-hidden relative">
+      <div className={`lg:col-span-7 flex flex-col h-[calc(100dvh-180px)] lg:h-[calc(100dvh-130px)] min-h-[500px] glass-panel border-[#22252F] bg-[#15161C] overflow-hidden relative ${
+        activePanel !== "chat" ? "hidden lg:flex" : "flex"
+      }`}>
         {/* Chat header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#22252F] bg-[#090A0F]/20 shrink-0">
           <div className="flex items-center gap-3">
@@ -779,7 +807,9 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
       </div>
 
       {/* RIGHT SIDE: Telemetry / Diagnostics */}
-      <div className="lg:col-span-5 flex flex-col gap-6 h-[calc(100vh-130px)] min-h-[500px] overflow-y-auto pr-1">
+      <div className={`lg:col-span-5 flex flex-col gap-6 h-[calc(100dvh-180px)] lg:h-[calc(100dvh-130px)] min-h-[500px] overflow-y-auto pr-1 ${
+        activePanel !== "telemetry" ? "hidden lg:flex" : "flex"
+      }`}>
         
         {/* Core telemetry details */}
         <div className="glass-panel border-[#22252F] bg-[#15161C] p-5 flex flex-col gap-4">

@@ -4,9 +4,13 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { useApp } from "../context/AppContext";
-import { Search, Bell, LogOut, ChevronDown, Check, User } from "lucide-react";
+import { Search, Bell, LogOut, ChevronDown, Check, User, Menu } from "lucide-react";
 
-export default function Navbar() {
+interface NavbarProps {
+  onMenuClick: () => void;
+}
+
+export default function Navbar({ onMenuClick }: NavbarProps) {
   const router = useRouter();
   const { logout } = usePrivy();
   const {
@@ -121,10 +125,20 @@ export default function Navbar() {
   }, []);
 
   return (
-    <header className="h-18 border-b border-[#22252F] bg-[#090A0F]/85 backdrop-blur-md px-6 flex items-center justify-between shrink-0 select-none z-30">
+    <header className="h-18 border-b border-[#22252F] bg-[#090A0F]/85 backdrop-blur-md px-4 md:px-6 flex items-center justify-between shrink-0 select-none z-30 gap-3">
       
+      {/* Mobile Hamburger Button — opens sidebar drawer */}
+      <button
+        onClick={onMenuClick}
+        className="lg:hidden w-9 h-9 rounded-xl border border-[#22252F] bg-[#15161C] hover:bg-[#22252F] flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+        aria-label="Open navigation menu"
+        id="mobile-menu-btn"
+      >
+        <Menu className="w-4.5 h-4.5" />
+      </button>
+
       {/* Token Ticker - Hidden on smaller screens */}
-      <div className="hidden lg:flex items-center overflow-hidden max-w-[55%] ticker-wrap select-none">
+      <div className="hidden lg:flex items-center overflow-hidden max-w-[55%] ticker-wrap select-none flex-1">
         <div className="flex items-center gap-8 text-xs font-medium ticker-content">
           {[...tickerPrices, ...tickerPrices].map((token, index) => (
             <div key={`${token.symbol}-${index}`} className="inline-flex items-center gap-2 shrink-0 mr-12 select-none">
@@ -150,9 +164,9 @@ export default function Navbar() {
       </div>
 
       {/* Right Controls */}
-      <div className="flex-1 lg:flex-none flex items-center gap-4 justify-end">
-        {/* Search Bar */}
-        <form onSubmit={handleSearchSubmit} className="relative max-w-sm w-full md:w-64">
+      <div className="flex items-center gap-2 md:gap-4 justify-end shrink-0">
+        {/* Search Bar — hidden on xs, visible from sm up */}
+        <form onSubmit={handleSearchSubmit} className="relative hidden sm:block w-44 md:w-64">
           <input
             type="text"
             placeholder="Search wallet (0x...)"

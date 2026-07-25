@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
@@ -14,9 +14,15 @@ import {
   Settings,
   Sparkles,
   LogOut,
+  X,
 } from "lucide-react";
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { agents } = useApp();
@@ -41,18 +47,40 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-66 flex flex-col h-full bg-[#090A0F] border-r border-[#22252F] py-6 px-4 shrink-0 justify-between select-none">
+    <aside
+      className={[
+        // Mobile: fixed overlay drawer, slides in/out from the left
+        "fixed inset-y-0 left-0 z-50 w-72",
+        "transform transition-transform duration-300 ease-in-out",
+        isOpen ? "translate-x-0" : "-translate-x-full",
+        // Desktop: always visible, part of normal flow (not fixed)
+        "lg:relative lg:translate-x-0 lg:w-66 lg:z-auto lg:inset-auto",
+        // Shared visual styles
+        "flex flex-col h-full bg-[#090A0F] border-r border-[#22252F] py-6 px-4 shrink-0 justify-between select-none",
+      ].join(" ")}
+    >
       <div className="flex flex-col gap-8">
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-3 px-2 group">
-          <div className="w-9 h-9 rounded-xl bg-neon-blue text-slate-950 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
-            <span className="font-extrabold text-slate-950 text-lg tracking-wider">A</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-white text-base tracking-tight">BlockGENT</span>
-            <span className="text-[10px] text-neon-cyan font-mono tracking-widest font-semibold uppercase">Circle Stack</span>
-          </div>
-        </Link>
+        {/* Brand Logo + Mobile Close Button */}
+        <div className="flex items-center justify-between px-2">
+          <Link href="/" className="flex items-center gap-3 group" onClick={onClose}>
+            <div className="w-9 h-9 rounded-xl bg-neon-blue text-slate-950 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
+              <span className="font-extrabold text-slate-950 text-lg tracking-wider">A</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-white text-base tracking-tight">BlockGENT</span>
+              <span className="text-[10px] text-neon-cyan font-mono tracking-widest font-semibold uppercase">Circle Stack</span>
+            </div>
+          </Link>
+
+          {/* Close button — mobile only */}
+          <button
+            onClick={onClose}
+            className="lg:hidden w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+            aria-label="Close sidebar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
         {/* Navigation Links */}
         <nav className="flex flex-col gap-1.5">
@@ -62,6 +90,7 @@ export default function Sidebar() {
               <Link
                 key={item.path}
                 href={item.path}
+                onClick={onClose}
                 className={`flex items-center gap-3.5 px-4.5 py-3.5 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden group ${
                   isActive
                     ? "bg-neon-blue/10 text-white"

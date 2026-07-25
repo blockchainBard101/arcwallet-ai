@@ -1,17 +1,24 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import ToastContainer from "./Toast";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react"; // kept for potential future use
 
 export default function AppLayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { ready, authenticated } = usePrivy();
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close mobile sidebar automatically on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   // Pages that don't get the app layout chrome (sidebar, navbar)
   const isMarketingPage = pathname === "/" || pathname === "/onboarding";
@@ -24,17 +31,33 @@ export default function AppLayoutShell({ children }: { children: React.ReactNode
 
   if (!ready) {
     return (
-      <div className="min-h-screen bg-background text-slate-100 flex flex-col justify-center items-center relative w-full overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-neon-blue/5 rounded-full blur-[120px] pointer-events-none" />
-        <div className="flex flex-col gap-4 text-center items-center relative z-10">
-          <div className="w-14 h-14 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-blue">
-            <Loader2 className="w-6 h-6 animate-spin" />
+      <div className="min-h-[100dvh] bg-background text-slate-100 flex flex-col justify-center items-center relative w-full overflow-hidden">
+        {/* Ambient glow bloom — bounded, HyperFrames css adapter */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-neon-blue/6 rounded-full blur-[100px] pointer-events-none animate-glow-bloom" />
+        
+        <div className="flex flex-col gap-5 text-center items-center relative z-10 animate-spring-pop">
+          {/* Logo mark */}
+          <div className="w-16 h-16 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
+            <span className="font-extrabold text-neon-blue text-2xl tracking-wider">A</span>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <h2 className="text-sm font-extrabold text-white tracking-tight">Initializing Session</h2>
             <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
               Setting up your secure cryptography environment...
             </p>
+          </div>
+          {/* Stagger-dot loader — CSS waterfall pattern */}
+          <div className="flex items-center gap-2">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="w-1.5 h-1.5 rounded-full bg-neon-blue"
+                style={{
+                  animation: `pulse 1.2s ease-in-out ${i * 200}ms infinite`,
+                  opacity: 0.5,
+                }}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -42,19 +65,27 @@ export default function AppLayoutShell({ children }: { children: React.ReactNode
   }
 
   if (!authenticated && !isMarketingPage) {
-    // Return a clean loading state while the redirect happens to prevent layout/UI flashing
     return (
-      <div className="min-h-screen bg-background text-slate-100 flex flex-col justify-center items-center relative w-full overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-neon-blue/5 rounded-full blur-[120px] pointer-events-none" />
-        <div className="flex flex-col gap-4 text-center items-center relative z-10">
-          <div className="w-14 h-14 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-blue">
-            <Loader2 className="w-6 h-6 animate-spin" />
+      <div className="min-h-[100dvh] bg-background text-slate-100 flex flex-col justify-center items-center relative w-full overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-neon-blue/6 rounded-full blur-[100px] pointer-events-none animate-glow-bloom" />
+        <div className="flex flex-col gap-5 text-center items-center relative z-10 animate-spring-pop">
+          <div className="w-16 h-16 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
+            <span className="font-extrabold text-neon-blue text-2xl tracking-wider">A</span>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <h2 className="text-sm font-extrabold text-white tracking-tight">Redirecting to Login</h2>
             <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
               Please authenticate to access your workspace.
             </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="w-1.5 h-1.5 rounded-full bg-neon-blue"
+                style={{ animation: `pulse 1.2s ease-in-out ${i * 200}ms infinite`, opacity: 0.5 }}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -63,7 +94,7 @@ export default function AppLayoutShell({ children }: { children: React.ReactNode
 
   if (isMarketingPage) {
     return (
-      <div className="min-h-screen bg-background text-slate-100 flex flex-col relative w-full overflow-x-hidden">
+      <div className="min-h-[100dvh] bg-background text-slate-100 flex flex-col relative w-full overflow-x-hidden">
         {children}
         <ToastContainer />
       </div>
@@ -71,17 +102,26 @@ export default function AppLayoutShell({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="h-screen bg-background text-slate-100 flex w-full overflow-hidden">
+    <div className="h-[100dvh] bg-background text-slate-100 flex w-full overflow-hidden">
+      {/* Mobile backdrop overlay — closes sidebar when tapped */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar navigation */}
-      <Sidebar />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main app body */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
         {/* Top Navbar */}
-        <Navbar />
+        <Navbar onMenuClick={() => setSidebarOpen(true)} />
 
         {/* Dynamic page contents */}
-        <main className="flex-1 overflow-y-auto bg-transparent p-6 relative">
+        <main className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6 relative">
           <div className="max-w-[1600px] mx-auto w-full h-full flex flex-col gap-6 animate-slide-in">
             {children}
           </div>
@@ -93,4 +133,3 @@ export default function AppLayoutShell({ children }: { children: React.ReactNode
     </div>
   );
 }
-

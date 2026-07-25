@@ -285,7 +285,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex-1 flex gap-6 h-[calc(100vh-8.5rem)] overflow-hidden select-none">
+    <div className="flex-1 flex gap-6 h-[calc(100dvh-8.5rem)] overflow-hidden select-none">
       
       {/* Sidebar - Recent Searches */}
       <div className="w-64 glass-panel border-[#22252F] bg-[#15161C] p-4 hidden md:flex flex-col gap-4 overflow-y-auto shrink-0">

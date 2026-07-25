@@ -65,7 +65,7 @@ export default function PricingPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
         
         {/* Free Tier */}
-        <div className="flex flex-col p-6 rounded-2xl border border-[#22252F] bg-[#090A0F] glass-panel relative">
+        <div className="flex flex-col p-6 rounded-2xl border border-[#22252F] bg-[#090A0F] glass-panel relative animate-spring-pop">
           <div className="mb-4">
             <h2 className="text-xl font-bold text-white mb-2">Free</h2>
             <div className="flex items-baseline gap-1">
@@ -105,7 +105,7 @@ export default function PricingPage() {
         </div>
 
         {/* Pro Tier (Recommended) */}
-        <div className="flex flex-col p-6 rounded-2xl border border-neon-blue bg-[#090A0F]/80 shadow-[0_0_30px_rgba(0,255,255,0.1)] relative scale-105 z-10">
+        <div className="flex flex-col p-6 rounded-2xl border border-neon-blue bg-[#090A0F]/80 shadow-[0_0_30px_rgba(0,255,255,0.1)] relative md:scale-105 z-10 animate-spring-pop">
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-neon-blue text-slate-950 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
             Most Popular
           </div>
@@ -151,7 +151,7 @@ export default function PricingPage() {
         </div>
 
         {/* Power Tier */}
-        <div className="flex flex-col p-6 rounded-2xl border border-[#22252F] bg-[#090A0F] relative">
+        <div className="flex flex-col p-6 rounded-2xl border border-[#22252F] bg-[#090A0F] relative animate-spring-pop">
           <div className="mb-4">
             <h2 className="text-xl font-bold text-white mb-2">Power</h2>
             <div className="flex items-baseline gap-1">

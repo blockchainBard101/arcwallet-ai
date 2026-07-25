@@ -80,28 +80,49 @@ export default function SettingsPage() {
         <p className="text-xs text-slate-400">Configure global preferences, authentication nodes, and automated safety policies.</p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-14rem)] overflow-hidden items-start">
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
         
-        {/* Navigation Tabs (Left) */}
-        <div className="w-full lg:w-60 flex flex-col gap-1.5 shrink-0">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase transition-all duration-200 cursor-pointer ${
-                activeTab === tab.id
-                  ? "bg-neon-blue/10 text-white border-l-2 border-neon-blue"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-[#22252F]/50"
-              }`}
-            >
-              <tab.icon className={`w-4 h-4 shrink-0 ${activeTab === tab.id ? "text-neon-blue" : "text-slate-400"}`} />
-              {tab.label}
-            </button>
-          ))}
+        {/* Navigation Tabs — horizontal scroll on mobile, vertical column on desktop */}
+        <div className="w-full lg:w-60 shrink-0">
+          {/* Mobile: horizontal scrollable pill tabs */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none lg:hidden">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-[10px] font-bold uppercase whitespace-nowrap transition-all duration-200 cursor-pointer shrink-0 ${
+                  activeTab === tab.id
+                    ? "bg-neon-blue/10 text-white border border-neon-blue/30"
+                    : "text-slate-400 hover:text-slate-200 bg-[#15161C] border border-[#22252F]"
+                }`}
+              >
+                <tab.icon className={`w-3.5 h-3.5 shrink-0 ${activeTab === tab.id ? "text-neon-blue" : "text-slate-400"}`} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop: vertical button list */}
+          <div className="hidden lg:flex flex-col gap-1.5">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold uppercase transition-all duration-200 cursor-pointer ${
+                  activeTab === tab.id
+                    ? "bg-neon-blue/10 text-white border-l-2 border-neon-blue"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-[#22252F]/50"
+                }`}
+              >
+                <tab.icon className={`w-4 h-4 shrink-0 ${activeTab === tab.id ? "text-neon-blue" : "text-slate-400"}`} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Dynamic Panels (Right) */}
-        <div className="flex-1 w-full glass-panel border-[#22252F] bg-[#15161C] p-6 overflow-y-auto h-full max-w-4xl">
+        <div className="flex-1 w-full glass-panel border-[#22252F] bg-[#15161C] p-5 md:p-6 overflow-y-auto max-w-4xl">
           
           {/* TAB 1: PROFILE */}
           {activeTab === "profile" && (
@@ -329,13 +350,11 @@ export default function SettingsPage() {
             </form>
           )}
 
-        </div>
-
           {/* TAB 5: SUBSCRIPTION */}
           {activeTab === "subscription" && (
             <div className="flex flex-col gap-5 animate-slide-in">
               <div className="flex flex-col gap-1 border-b border-[#22252F] pb-3">
-                <span className="text-sm font-bold text-white tracking-tight">Billing & Plans</span>
+                <span className="text-sm font-bold text-white tracking-tight">Billing &amp; Plans</span>
                 <span className="text-[10px] text-slate-500 font-mono">Manage your subscription tier, quotas, and nanopayment limits</span>
               </div>
 
