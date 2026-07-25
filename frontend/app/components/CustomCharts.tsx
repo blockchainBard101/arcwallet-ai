@@ -299,8 +299,12 @@ export function DexDistributionChart({
     { name: "Balancer", value: 12, color: "var(--neon-purple)" },
     { name: "Others", value: 8, color: "var(--neon-magenta)" },
   ],
+  centerLabel = "Total DEX",
+  centerValue = "100%",
 }: {
   data?: DonutData[];
+  centerLabel?: string;
+  centerValue?: string;
 }) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
@@ -315,7 +319,7 @@ export function DexDistributionChart({
   let accumulatedLength = 0;
 
   return (
-    <div className="flex flex-col md:flex-row items-center gap-6 justify-center w-full">
+    <div className="flex flex-col items-center gap-4 justify-center w-full">
       {/* SVG Donut */}
       <div className="relative w-[220px] h-[220px] shrink-0">
         <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${chartSize} ${chartSize}`}>
@@ -353,10 +357,10 @@ export function DexDistributionChart({
           
           <g transform={`translate(${center}, ${center})`} textAnchor="middle">
             <text y="-5" fill="#94a3b8" fontSize="11" className="font-semibold uppercase tracking-wider">
-              {activeIdx !== null ? data[activeIdx].name : "Total DEX"}
+              {activeIdx !== null ? data[activeIdx].name : centerLabel}
             </text>
             <text y="18" fill="#ffffff" fontSize="18" className="font-bold font-mono">
-              {activeIdx !== null ? `${data[activeIdx].value}%` : "100%"}
+              {activeIdx !== null ? `${data[activeIdx].value}%` : centerValue}
             </text>
           </g>
         </svg>

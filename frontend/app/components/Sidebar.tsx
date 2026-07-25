@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
@@ -25,9 +26,10 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { agents } = useApp();
+  const { agents, rules, isLoadingAgents } = useApp();
   const { logout } = usePrivy();
   const { disconnectWallet } = useApp();
+
 
   const menuItems = [
     { name: "Explorer Chat", icon: Compass, path: "/chat" },
@@ -63,8 +65,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Brand Logo + Mobile Close Button */}
         <div className="flex items-center justify-between px-2">
           <Link href="/" className="flex items-center gap-3 group" onClick={onClose}>
-            <div className="w-9 h-9 rounded-xl bg-neon-blue text-slate-950 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
-              <span className="font-extrabold text-slate-950 text-lg tracking-wider">A</span>
+            <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-[#090A0F] border border-neon-blue/20 transition-transform duration-300 group-hover:scale-105 shrink-0">
+              <Image
+                src="/blockgent.png"
+                alt="BlockGENT"
+                width={36}
+                height={36}
+                className="object-contain"
+                priority
+              />
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-white text-base tracking-tight">BlockGENT</span>
@@ -142,19 +151,33 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="flex flex-col gap-2 font-mono text-[10px]">
             <div className="flex justify-between items-center text-slate-400">
               <span>Active Agents:</span>
-              <span className="text-white font-semibold">3 / 3</span>
+              <span className="text-white font-semibold">
+                {isLoadingAgents ? (
+                  <span className="skeleton w-8 h-3 rounded inline-block" />
+                ) : (
+                  `${agents.filter((a) => a.status === "active").length} / ${agents.length}`
+                )}
+              </span>
             </div>
             <div className="flex justify-between items-center text-slate-400">
               <span>Active Rules:</span>
-              <span className="text-white font-semibold">14 Running</span>
-            </div>
-            <div className="flex justify-between items-center text-slate-400">
-              <span>Network TPS:</span>
-              <span className="text-white font-semibold">9.82 TPS</span>
+              <span className="text-white font-semibold">
+                {isLoadingAgents ? (
+                  <span className="skeleton w-12 h-3 rounded inline-block" />
+                ) : (
+                  `${Object.values(rules).reduce((acc, list) => acc + list.filter((r) => r.active).length, 0)} Running`
+                )}
+              </span>
             </div>
             <div className="flex justify-between items-center text-slate-400">
               <span>Guardrails:</span>
-              <span className="text-emerald-400 font-bold">Standard</span>
+              <span className="text-emerald-400 font-bold">
+                {isLoadingAgents ? (
+                  <span className="skeleton w-14 h-3 rounded inline-block" />
+                ) : (
+                  "Standard"
+                )}
+              </span>
             </div>
           </div>
         </div>

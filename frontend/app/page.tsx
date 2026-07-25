@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApp } from "./context/AppContext";
-import { Bot, ArrowRight, ShieldCheck, Compass, BarChart3, Coins, Sparkles, Send, User } from "lucide-react";
+import { ArrowRight, ShieldCheck, Compass, BarChart3, Coins, Sparkles, Send, User, Bot } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 export default function LandingPage() {
@@ -81,9 +82,9 @@ export default function LandingPage() {
 
       {/* Landing Header */}
       <header className="h-20 max-w-[1400px] w-full mx-auto px-6 flex items-center justify-between z-20">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-neon-blue flex items-center justify-center">
-            <span className="font-extrabold text-slate-950 text-lg tracking-wider">A</span>
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-[#090A0F] border border-neon-blue/20 transition-transform duration-300 group-hover:scale-105 shrink-0">
+            <Image src="/blockgent.png" alt="BlockGENT" width={36} height={36} className="object-contain" priority />
           </div>
           <span className="font-bold text-white text-base tracking-tight">BlockGENT <span className="text-neon-cyan text-xs">AI</span></span>
         </Link>
@@ -156,10 +157,14 @@ export default function LandingPage() {
                 key={idx}
                 className={`flex gap-3 max-w-[85%] ${msg.sender === "user" ? "self-end flex-row-reverse" : "self-start"}`}
               >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 shrink-0 ${
-                  msg.sender === "user" ? "bg-neon-blue/10 text-neon-blue border border-neon-blue/20" : "bg-[#090A0F] border border-[#22252F] text-neon-cyan"
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  msg.sender === "user"
+                    ? "bg-neon-blue/10 text-neon-blue border border-neon-blue/20"
+                    : "bg-[#090A0F] border border-[#22252F] overflow-hidden"
                 }`}>
-                  {msg.sender === "user" ? <User className="w-4.5 h-4.5" /> : <Bot className="w-4.5 h-4.5" />}
+                  {msg.sender === "user"
+                    ? <User className="w-4.5 h-4.5" />
+                    : <Image src="/blockgent.png" alt="BlockGENT" width={32} height={32} className="object-contain" />}
                 </div>
 
                 <div className="flex flex-col gap-2">

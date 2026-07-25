@@ -21,7 +21,7 @@ const RULE_TEMPLATES = [
 
 export default function AgentsPage() {
   const router = useRouter();
-  const { agents, rules, addAgent, toggleAgentStatus, triggerToast } = useApp();
+  const { agents, rules, addAgent, toggleAgentStatus, triggerToast, isLoadingAgents } = useApp();
   const [modalOpen, setModalOpen] = useState(false);
 
   // Form states
@@ -96,125 +96,179 @@ export default function AgentsPage() {
 
       {/* Agents Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-        {agents.map((agent) => {
-          const isPaused = agent.status === "paused";
-          const agentRules = rules[agent.id] || [];
-
-          return (
+        {isLoadingAgents ? (
+          [1, 2].map((i) => (
             <div
-              key={agent.id}
-              onClick={() => router.push(`/agents/${agent.id}`)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && router.push(`/agents/${agent.id}`)}
-              className={`glass-panel border-[#22252F] bg-[#15161C] p-5 flex flex-col justify-between min-h-[220px] transition-all duration-300 relative overflow-hidden group cursor-pointer hover:border-neon-blue/30 hover:bg-[#15161C]/90 ${
-                isPaused ? "opacity-60" : ""
-              }`}
+              key={i}
+              className="glass-panel border-[#22252F] bg-[#15161C] p-5 flex flex-col justify-between min-h-[220px] relative overflow-hidden"
             >
-              {/* Card top banner */}
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                    isPaused
-                      ? "bg-[#090A0F] border-[#22252F] text-slate-500"
-                      : "bg-neon-cyan/10 border-neon-cyan/20 text-neon-cyan glow-cyan"
-                  }`}>
-                    <Bot className="w-5.5 h-5.5" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-white tracking-tight">{agent.name}</span>
-                    <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
-                      {agent.model}
-                    </span>
+                  <div className="w-10 h-10 rounded-xl bg-[#22252F]/40 skeleton shrink-0" />
+                  <div className="flex flex-col gap-1.5">
+                    <div className="skeleton skeleton-text w-32" />
+                    <div className="skeleton skeleton-text w-20 opacity-60" style={{ height: "0.65em" }} />
                   </div>
                 </div>
-
-                {/* Status Toggle Button */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleAgentStatus(agent.id); }}
-                  className={`h-8 px-3 rounded-lg border text-[10px] font-bold uppercase cursor-pointer flex items-center gap-1 transition-all ${
-                    isPaused
-                      ? "border-neon-cyan/20 bg-neon-cyan/5 text-neon-cyan hover:bg-neon-cyan/10"
-                      : "border-amber-500/20 bg-amber-500/5 text-amber-500 hover:bg-amber-500/10"
-                  }`}
-                >
-                  {isPaused ? (
-                    <>
-                      <Play className="w-3 h-3" />
-                      Resume
-                    </>
-                  ) : (
-                    <>
-                      <Pause className="w-3 h-3" />
-                      Pause
-                    </>
-                  )}
-                </button>
+                <div className="w-20 h-8 rounded-lg bg-[#22252F]/40 skeleton" />
               </div>
-
-              {/* Card Mid: Wallet info & balance */}
+              
               <div className="flex flex-col gap-1 mt-4">
-                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">Agent Vault</span>
-                <div className="flex items-center gap-2 bg-[#090A0F]/60 p-2 rounded-lg border border-[#22252F] justify-between relative group/address">
-                  <span className="text-[10px] font-mono text-slate-300 truncate select-all pr-8">
-                    {agent.wallet}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(agent.wallet);
-                      triggerToast?.("Agent wallet address copied!", "info");
-                    }}
-                    className="p-1 hover:bg-[#22252F] rounded text-slate-500 hover:text-white transition-colors absolute right-2 bg-[#090A0F]/60"
-                    title="Copy wallet address"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                <div className="skeleton skeleton-text w-16 opacity-60" style={{ height: "0.6em" }} />
+                <div className="w-full h-8 rounded-lg bg-[#22252F]/40 skeleton" />
               </div>
 
-              {/* Card bottom: metrics & management controls */}
               <div className="flex items-end justify-between border-t border-[#22252F] pt-4 mt-4">
                 <div className="flex gap-4">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Vault Balance</span>
-                    <span className="text-sm font-bold text-white font-mono mt-0.5">
-                      {agent.balance.toLocaleString()} {agent.token}
-                    </span>
+                  <div className="flex flex-col gap-1">
+                    <div className="skeleton skeleton-text w-16 opacity-60" style={{ height: "0.6em" }} />
+                    <div className="skeleton skeleton-text w-12" />
                   </div>
-                  <div className="flex flex-col border-l border-[#22252F] pl-4">
-                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Rules Active</span>
-                    <span className="text-sm font-bold text-neon-cyan font-mono mt-0.5">
-                      {agentRules.filter(r => r.active).length}/{agentRules.length}
-                    </span>
+                  <div className="flex flex-col gap-1 border-l border-[#22252F] pl-4">
+                    <div className="skeleton skeleton-text w-16 opacity-60" style={{ height: "0.6em" }} />
+                    <div className="skeleton skeleton-text w-8" />
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); router.push(`/agents/${agent.id}/dashboard`); }}
-                    className="p-2 rounded-lg bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-slate-400 hover:text-white transition-colors cursor-pointer"
-                    title="View Analytics Dashboard"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); router.push(`/agents/${agent.id}`); }}
-                    className="h-8 px-3 rounded-lg bg-neon-blue text-slate-950 font-bold text-[10px] uppercase flex items-center gap-1 cursor-pointer hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    Open Chat
-                  </button>
+                <div className="flex gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#22252F]/40 skeleton" />
+                  <div className="w-24 h-8 rounded-lg bg-[#22252F]/40 skeleton" />
                 </div>
-              </div>
-
-              {/* Subtle hover arrow indicator */}
-              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                <ArrowRight className="w-3.5 h-3.5 text-neon-blue/50" />
               </div>
             </div>
-          );
-        })}
+          ))
+        ) : agents.length === 0 ? (
+          <div className="col-span-1 md:col-span-2 glass-panel border-[#22252F] bg-[#15161C] p-8 flex flex-col items-center justify-center text-center gap-4 py-12">
+            <div className="w-12 h-12 rounded-full bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-blue animate-pulse">
+              <Bot className="w-6 h-6" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <h3 className="font-bold text-white text-sm">No Active Agent Vaults</h3>
+              <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
+                You haven't provisioned any Circle Agent Wallets yet. Use the button in the top right to deploy your first secure automation node.
+              </p>
+            </div>
+          </div>
+        ) : (
+          agents.map((agent) => {
+            const isPaused = agent.status === "paused";
+            const agentRules = rules[agent.id] || [];
+
+            return (
+              <div
+                key={agent.id}
+                onClick={() => router.push(`/agents/${agent.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && router.push(`/agents/${agent.id}`)}
+                className={`glass-panel border-[#22252F] bg-[#15161C] p-5 flex flex-col justify-between min-h-[220px] transition-all duration-300 relative overflow-hidden group cursor-pointer hover:border-neon-blue/30 hover:bg-[#15161C]/90 ${
+                  isPaused ? "opacity-60" : ""
+                }`}
+              >
+                {/* Card top banner */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                      isPaused
+                        ? "bg-[#090A0F] border-[#22252F] text-slate-500"
+                        : "bg-neon-cyan/10 border-neon-cyan/20 text-neon-cyan glow-cyan"
+                    }`}>
+                      <Bot className="w-5.5 h-5.5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-white tracking-tight">{agent.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+                        {agent.model}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status Toggle Button */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleAgentStatus(agent.id); }}
+                    className={`h-8 px-3 rounded-lg border text-[10px] font-bold uppercase cursor-pointer flex items-center gap-1 transition-all ${
+                      isPaused
+                        ? "border-neon-cyan/20 bg-neon-cyan/5 text-neon-cyan hover:bg-neon-cyan/10"
+                        : "border-amber-500/20 bg-amber-500/5 text-amber-500 hover:bg-amber-500/10"
+                    }`}
+                  >
+                    {isPaused ? (
+                      <>
+                        <Play className="w-3 h-3" />
+                        Resume
+                      </>
+                    ) : (
+                      <>
+                        <Pause className="w-3 h-3" />
+                        Pause
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Card Mid: Wallet info & balance */}
+                <div className="flex flex-col gap-1 mt-4">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">Agent Vault</span>
+                  <div className="flex items-center gap-2 bg-[#090A0F]/60 p-2 rounded-lg border border-[#22252F] justify-between relative group/address">
+                    <span className="text-[10px] font-mono text-slate-300 truncate select-all pr-8">
+                      {agent.wallet}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(agent.wallet);
+                        triggerToast?.("Agent wallet address copied!", "info");
+                      }}
+                      className="p-1 hover:bg-[#22252F] rounded text-slate-500 hover:text-white transition-colors absolute right-2 bg-[#090A0F]/60"
+                      title="Copy wallet address"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Card bottom: metrics & management controls */}
+                <div className="flex items-end justify-between border-t border-[#22252F] pt-4 mt-4">
+                  <div className="flex gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Vault Balance</span>
+                      <span className="text-sm font-bold text-white font-mono mt-0.5">
+                        {agent.balance.toLocaleString()} {agent.token}
+                      </span>
+                    </div>
+                    <div className="flex flex-col border-l border-[#22252F] pl-4">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Rules Active</span>
+                      <span className="text-sm font-bold text-neon-cyan font-mono mt-0.5">
+                        {agentRules.filter(r => r.active).length}/{agentRules.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); router.push(`/agents/${agent.id}/dashboard`); }}
+                      className="p-2 rounded-lg bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-slate-400 hover:text-white transition-colors cursor-pointer"
+                      title="View Analytics Dashboard"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); router.push(`/agents/${agent.id}`); }}
+                      className="h-8 px-3 rounded-lg bg-neon-blue text-slate-950 font-bold text-[10px] uppercase flex items-center gap-1 cursor-pointer hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Open Chat
+                    </button>
+                  </div>
+                </div>
+
+                {/* Subtle hover arrow indicator */}
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                  <ArrowRight className="w-3.5 h-3.5 text-neon-blue/50" />
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* CREATE NEW AGENT OVERLAY MODAL */}

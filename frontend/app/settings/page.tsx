@@ -8,12 +8,22 @@ import { User, Wallet, Bell, Shield, Lock, CreditCard, Sparkles, RefreshCw, LogO
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { logout } = usePrivy();
+  const { logout, user } = usePrivy();
   const { connectedWallet, connectWallet, disconnectWallet, triggerToast } = useApp();
 
-  const [username, setUsername] = useState("BlockchainBard");
-  const [email, setEmail] = useState("bard@blockchain.io");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [activeTab, setActiveTab] = useState("security");
+
+  // Sync profile details with Privy user profile
+  React.useEffect(() => {
+    if (user) {
+      const privyEmail = user.email?.address || user.google?.email || "";
+      const defaultUsername = user.google?.name || (privyEmail ? privyEmail.split("@")[0] : `User_${user.id.slice(-6)}`);
+      setUsername(defaultUsername);
+      setEmail(privyEmail);
+    }
+  }, [user]);
 
   // Security States
   const [maxTxLimit, setMaxTxLimit] = useState(50);

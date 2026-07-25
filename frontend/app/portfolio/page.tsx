@@ -32,14 +32,27 @@ export default function PortfolioPage() {
 
   // Portfolio allocation assets data
   const allocationData = [
-    { name: "USDC (Stable)", value: Math.round(((userBalanceUSDC + agents.filter(a => a.token === "USDC").reduce((acc, c) => acc + c.balance, 0)) / totalPortfolioValue) * 100), color: "#F97316" },
-    { name: "EURC (Stable)", value: Math.round((((userBalanceEURC + agents.filter(a => a.token === "EURC").reduce((acc, c) => acc + c.balance, 0)) * eurcUSDValue) / totalPortfolioValue) * 100), color: "#ADF02F" },
-    { name: "USDT (Stable)", value: 0, color: "#64748B" },
+    { 
+      name: "USDC (Stable)", 
+      value: totalPortfolioValue > 0 
+        ? Math.round(((userBalanceUSDC + agents.filter(a => a.token === "USDC").reduce((acc, c) => acc + c.balance, 0)) / totalPortfolioValue) * 100) 
+        : 0, 
+      color: "#F97316" 
+    },
+    { 
+      name: "EURC (Stable)", 
+      value: totalPortfolioValue > 0 
+        ? Math.round((((userBalanceEURC + agents.filter(a => a.token === "EURC").reduce((acc, c) => acc + c.balance, 0)) * eurcUSDValue) / totalPortfolioValue) * 100) 
+        : 0, 
+      color: "#ADF02F" 
+    },
   ];
 
   // If sum doesn't hit 100 due to rounding, force adjustment
   const sumPercent = allocationData.reduce((acc, c) => acc + c.value, 0);
-  if (sumPercent < 100 && sumPercent > 0) allocationData[0].value += (100 - sumPercent);
+  if (sumPercent < 100 && sumPercent > 0) {
+    allocationData[0].value += (100 - sumPercent);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -89,7 +102,11 @@ export default function PortfolioPage() {
           </div>
 
           <div className="flex-1 flex items-center justify-center min-h-[220px]">
-            <DexDistributionChart data={allocationData} />
+            <DexDistributionChart 
+              data={allocationData} 
+              centerLabel="Total Assets" 
+              centerValue={totalPortfolioValue > 0 ? "100%" : "0%"} 
+            />
           </div>
         </div>
 

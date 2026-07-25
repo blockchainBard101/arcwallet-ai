@@ -5,6 +5,9 @@ import { PrivyProvider, usePrivy, useWallets } from "@privy-io/react-auth";
 import { arcTestnet } from "viem/chains";
 
 export const getBackendUrl = () => {
+  if (process.env.NEXT_PUBLIC_BACKEND_URL) {
+    return process.env.NEXT_PUBLIC_BACKEND_URL;
+  }
   if (typeof window !== "undefined") {
     return `http://${window.location.hostname}:3001`;
   }
@@ -86,6 +89,7 @@ interface AppContextType {
   chats: Record<string, ChatMessage[]>;
   activityLog: Activity[];
   toasts: Toast[];
+  isLoadingAgents: boolean;
   connectWallet: (address?: string) => void;
   disconnectWallet: () => void;
   searchWallet: (address: string) => void;
@@ -107,90 +111,11 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const INITIAL_AGENTS: Agent[] = [
-  {
-    id: "agent-1",
-    name: "Yield Harvester",
-    model: "Claude 3.5 Sonnet",
-    status: "active",
-    wallet: "0xArcAgent1A2zP1eP5q77ab",
-    balance: 1450.0,
-    token: "USDC",
-    created: "2026-05-10",
-    rulesCount: 3,
-    successRate: 98.4,
-    gasSpent: 1.25,
-  },
-  {
-    id: "agent-2",
-    name: "Arbitrage Scout",
-    model: "Grok 2.0",
-    status: "idle",
-    wallet: "0xArcAgent2B3yQ2fR6r88bc",
-    balance: 842.15,
-    token: "EURC",
-    created: "2026-05-15",
-    rulesCount: 1,
-    successRate: 100,
-    gasSpent: 0.45,
-  },
-];
+const INITIAL_AGENTS: Agent[] = [];
 
-const INITIAL_RULES: Record<string, Rule[]> = {
-  "agent-1": [
-    {
-      id: "rule-1",
-      text: "If USDC balance is greater than 1000, swap 100 USDC to EURC weekly.",
-      trigger: "Balance (> 1000 USDC)",
-      action: "Swap 100 USDC to EURC",
-      active: true,
-      lastTriggered: "2026-05-20 14:32",
-    },
-    {
-      id: "rule-2",
-      text: "Alert me on push notification if transaction size exceeds 500 USDC.",
-      trigger: "Transaction Size (> 500 USDC)",
-      action: "Push Alert",
-      active: true,
-      lastTriggered: "Never",
-    },
-    {
-      id: "rule-3",
-      text: "Auto-rebalance portfolio to 80% USDC and 20% EURC every Sunday at 00:00 UTC.",
-      trigger: "Scheduled (Weekly)",
-      action: "Rebalance Portfolio",
-      active: false,
-      lastTriggered: "2026-05-18 00:00",
-    },
-  ],
-  "agent-2": [
-    {
-      id: "rule-4",
-      text: "If price of EURC drops below 1.05 USDC, auto-buy 200 EURC with USDC from agent wallet.",
-      trigger: "Price (EURC < 1.05 USDC)",
-      action: "Buy 200 EURC",
-      active: true,
-      lastTriggered: "Never",
-    },
-  ],
-};
+const INITIAL_RULES: Record<string, Rule[]> = {};
 
-const INITIAL_ALERTS: Alert[] = [
-  {
-    id: "alert-1",
-    condition: "USDC Balance drops below 500",
-    channel: "In-App + Email",
-    active: true,
-    created: "2026-05-12",
-  },
-  {
-    id: "alert-2",
-    condition: "Gas price on Arc L1 > 50 Gwei",
-    channel: "In-App",
-    active: false,
-    created: "2026-05-18",
-  },
-];
+const INITIAL_ALERTS: Alert[] = [];
 
 const INITIAL_CHATS: Record<string, ChatMessage[]> = {
   public: [
@@ -201,65 +126,9 @@ const INITIAL_CHATS: Record<string, ChatMessage[]> = {
       timestamp: "15:10",
     },
   ],
-  "agent-1": [
-    {
-      id: "m-2",
-      sender: "agent",
-      text: "Yield Harvester online. Ready to execute rules and monitor the Arc blockchain. I am currently running 2 active automated rules. What would you like to check?",
-      timestamp: "12:00",
-    },
-  ],
-  "agent-2": [
-    {
-      id: "m-3",
-      sender: "agent",
-      text: "Arbitrage Scout initialized. Connected to Circle Agent Wallet. Standing by.",
-      timestamp: "12:05",
-    },
-  ],
 };
 
-const INITIAL_ACTIVITY: Activity[] = [
-  {
-    id: "act-1",
-    type: "rule_trigger",
-    title: "Rule Executed: Auto-Reinvest",
-    description: "Yield Harvester swapped 100 USDC for 92.5 EURC successfully.",
-    wallet: "0xArcAgent1A2zP1eP5q77ab",
-    status: "success",
-    value: "100.00 USDC",
-    timestamp: "2026-05-20 14:32",
-  },
-  {
-    id: "act-2",
-    type: "swap",
-    title: "Portfolio Swap",
-    description: "Swapped 500 USDC for 462 EURC.",
-    wallet: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-    status: "success",
-    value: "500.00 USDC",
-    timestamp: "2026-05-19 09:15",
-  },
-  {
-    id: "act-3",
-    type: "transfer",
-    title: "Bridge Deposit",
-    description: "Bridged 2,500 USDC from Ethereum to Arc.",
-    wallet: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
-    status: "success",
-    value: "2,500.00 USDC",
-    timestamp: "2026-05-17 16:40",
-  },
-  {
-    id: "act-4",
-    type: "agent_creation",
-    title: "Agent Created: Arbitrage Scout",
-    description: "Provisioned Circle Agent Wallet 0xArcAgent2B...bc.",
-    wallet: "0xArcAgent2B3yQ2fR6r88bc",
-    status: "success",
-    timestamp: "2026-05-15 12:05",
-  },
-];
+const INITIAL_ACTIVITY: Activity[] = [];
 
 import { UpgradeModal } from "../components/UpgradeModal";
 
@@ -383,11 +252,13 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
   }, [authenticated, privyUser, wallets]);
 
   const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
 
   // Load agents from NestJS backend when user is authenticated
   useEffect(() => {
     if (authenticated) {
       const loadAgents = async () => {
+        setIsLoadingAgents(true);
         try {
           const token = await getAccessToken();
           if (!token) return;
@@ -416,11 +287,14 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
           }
         } catch (err) {
           console.error("Error loading agents from backend:", err);
+        } finally {
+          setIsLoadingAgents(false);
         }
       };
       loadAgents();
     } else {
       setAgents(INITIAL_AGENTS);
+      setIsLoadingAgents(false);
     }
   }, [authenticated]);
   const [rules, setRules] = useState<Record<string, Rule[]>>(INITIAL_RULES);
@@ -763,6 +637,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
         chats,
         activityLog,
         toasts,
+        isLoadingAgents,
         connectWallet,
         disconnectWallet,
         searchWallet,

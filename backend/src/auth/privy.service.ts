@@ -36,6 +36,11 @@ export class PrivyService implements OnModuleInit {
       const claims = await this.client.utils().auth().verifyAuthToken(token);
       return claims;
     } catch (error) {
+      console.error('Privy token verification failed details:', {
+        message: error.message,
+        stack: error.stack,
+        errorObject: error,
+      });
       throw new Error(`Privy token verification failed: ${error.message}`);
     }
   }

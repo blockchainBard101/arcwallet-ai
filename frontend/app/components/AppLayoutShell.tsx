@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import Sidebar from "./Sidebar";
@@ -37,8 +38,8 @@ export default function AppLayoutShell({ children }: { children: React.ReactNode
         
         <div className="flex flex-col gap-5 text-center items-center relative z-10 animate-spring-pop">
           {/* Logo mark */}
-          <div className="w-16 h-16 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
-            <span className="font-extrabold text-neon-blue text-2xl tracking-wider">A</span>
+          <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center bg-[#090A0F] border border-neon-blue/20">
+            <Image src="/blockgent.png" alt="BlockGENT" width={56} height={56} className="object-contain" priority />
           </div>
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-extrabold text-white tracking-tight">Initializing Session</h2>
@@ -69,8 +70,8 @@ export default function AppLayoutShell({ children }: { children: React.ReactNode
       <div className="min-h-[100dvh] bg-background text-slate-100 flex flex-col justify-center items-center relative w-full overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-neon-blue/6 rounded-full blur-[100px] pointer-events-none animate-glow-bloom" />
         <div className="flex flex-col gap-5 text-center items-center relative z-10 animate-spring-pop">
-          <div className="w-16 h-16 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
-            <span className="font-extrabold text-neon-blue text-2xl tracking-wider">A</span>
+          <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center bg-[#090A0F] border border-neon-blue/20">
+            <Image src="/blockgent.png" alt="BlockGENT" width={56} height={56} className="object-contain" priority />
           </div>
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-extrabold text-white tracking-tight">Redirecting to Login</h2>

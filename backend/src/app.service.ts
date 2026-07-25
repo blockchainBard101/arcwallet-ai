@@ -96,32 +96,66 @@ export class AppService {
     let realTxs: any[] = [];
     let fetchedFromExplorer = false;
 
-    try {
-      const explorerUrl = `https://testnet.arcscan.app/api/v2/addresses/${address}/token-transfers?type=ERC-20`;
-      const explorerRes = await fetch(explorerUrl);
-      if (explorerRes.ok) {
-        const explorerData = await explorerRes.json();
-        if (explorerData && Array.isArray(explorerData.items)) {
-          realTxs = explorerData.items.map((item: any, idx: number) => {
-            const valDec = Number(item.total?.value || 0) / Math.pow(10, Number(item.total?.decimals || 6));
-            const isIncoming = item.to?.hash?.toLowerCase() === address.toLowerCase();
-            return {
-              id: item.transaction_hash || `tx-real-${idx}`,
-              type: 'transfer',
-              title: isIncoming ? 'Bridge Deposit' : 'Vault Withdrawal',
-              description: isIncoming ? `Received ${valDec} USDC` : `Sent ${valDec} USDC`,
-              wallet: address,
-              status: 'success',
-              value: `${valDec.toFixed(2)} USDC`,
-              timestamp: item.timestamp || new Date().toISOString(),
-            };
-          });
-          fetchedFromExplorer = true;
-          this.logger.log(`Successfully fetched ${realTxs.length} transfer transactions from Blockscout explorer API.`);
+    let explorerData: any = null;
+    const maxRetries = 5;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const explorerUrl = `https://testnet.arcscan.app/api?module=account&action=txlist&address=${address}`;
+        const explorerRes = await fetch(explorerUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+          }
+        });
+        if (explorerRes.ok) {
+          const contentType = explorerRes.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await explorerRes.json();
+            if (data && data.status === '1' && Array.isArray(data.result)) {
+              explorerData = data;
+              break;
+            }
+          }
         }
+      } catch (err: any) {
+        this.logger.warn(`Explorer API attempt ${attempt} failed: ${err.message}`);
       }
-    } catch (err: any) {
-      this.logger.warn(`Explorer API failed, falling back to RPC logs: ${err.message}`);
+      
+      if (attempt < maxRetries) {
+        // Wait before retrying (exponential backoff starting at 200ms)
+        await new Promise(resolve => setTimeout(resolve, 200 * attempt));
+      }
+    }
+
+    if (explorerData) {
+      try {
+        realTxs = explorerData.result.map((item: any, idx: number) => {
+          // On Arc L1, native gas is USDC and is scaled to 18 decimals
+          const valDec = Number(item.value || 0) / 1e18;
+          const isIncoming = item.to?.toLowerCase() === address.toLowerCase();
+          const isSwap = (item.input && item.input !== '0x' && !isIncoming);
+
+          return {
+            id: item.hash || `tx-real-${idx}`,
+            type: isSwap ? 'swap' : 'transfer',
+            title: isSwap 
+              ? 'Portfolio Swap' 
+              : (isIncoming ? 'Bridge Deposit' : 'Vault Withdrawal'),
+            description: isSwap
+              ? `Executed Swap of ${valDec.toFixed(2)} USDC`
+              : (isIncoming ? `Received ${valDec.toFixed(2)} USDC` : `Sent ${valDec.toFixed(2)} USDC`),
+            wallet: address,
+            status: item.isError === '0' ? 'success' : 'failed',
+            value: `${valDec.toFixed(2)} USDC`,
+            timestamp: item.timeStamp ? new Date(Number(item.timeStamp) * 1000).toISOString() : new Date().toISOString(),
+          };
+        });
+        fetchedFromExplorer = true;
+        this.logger.log(`Successfully fetched ${realTxs.length} transactions from Blockscout legacy explorer API.`);
+      } catch (err: any) {
+        this.logger.error(`Failed parsing explorer transaction data: ${err.message}`);
+      }
     }
 
     if (!fetchedFromExplorer) {
