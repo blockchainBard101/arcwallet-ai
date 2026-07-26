@@ -130,6 +130,18 @@ export async function executeTool(
         },
         ctx,
       );
+    case 'swap_tokens':
+      return handleSwapTokens(
+        toolInput as {
+          fromAgentId: string;
+          tokenIn: string;
+          tokenOut: string;
+          amountIn: number;
+          chain?: string;
+          slippageBps?: number;
+        },
+        ctx,
+      );
     default:
       return JSON.stringify({ error: `Unknown tool: ${toolName}` });
   }
@@ -359,7 +371,7 @@ async function handleGetPublicWalletStats(
   ctx: ToolContext,
 ): Promise<string> {
   try {
-    const statsService = new AppService(ctx.prisma);
+    const statsService = new AppService(ctx.prisma, ctx.circle);
     const stats = await statsService.getWalletStats(input.address);
     return JSON.stringify(stats);
   } catch (err) {
@@ -1239,3 +1251,121 @@ async function handleAnalyzeTransaction(input: { txHash: string }, ctx: ToolCont
     return JSON.stringify({ error: err.message ?? 'Failed to analyze transaction' });
   }
 }
+
+async function handleSwapTokens(
+  input: {
+    fromAgentId: string;
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: number;
+    chain?: string;
+    slippageBps?: number;
+  },
+  ctx: ToolContext,
+): Promise<string> {
+  const agent = await ctx.prisma.agent.findFirst({
+    where: { id: input.fromAgentId, userId: ctx.userId },
+    include: { wallet: true },
+  });
+  if (!agent) return JSON.stringify({ error: 'Source agent not found or not owned by you.' });
+
+  if (input.amountIn <= 0) {
+    return JSON.stringify({ error: 'AmountIn must be greater than 0.' });
+  }
+
+  const apiKey = process.env.CIRCLE_API_KEY;
+  const entitySecret = process.env.ENTITY_SECRET;
+
+  if (!apiKey || !entitySecret) {
+    return JSON.stringify({ error: 'Circle API configuration missing on the server.' });
+  }
+
+  try {
+    const { AppKit } = await import('@circle-fin/app-kit');
+    const { createCircleWalletsAdapter } = await import('@circle-fin/adapter-circle-wallets');
+
+    const kit = new AppKit();
+    const adapter = createCircleWalletsAdapter({
+      apiKey,
+      entitySecret,
+    });
+
+    const chain = input.chain ?? 'Arc_Testnet';
+    const kitKey = process.env.KIT_KEY || process.env.CIRCLE_KIT_KEY || '';
+
+    let estimatedOutput: string | undefined;
+    try {
+      const estimation = await kit.estimateSwap({
+        from: { adapter, chain: chain as any, address: agent.wallet.address },
+        tokenIn: input.tokenIn.toUpperCase(),
+        tokenOut: input.tokenOut.toUpperCase(),
+        amountIn: input.amountIn.toFixed(6),
+        config: { kitKey },
+      });
+      estimatedOutput = typeof estimation.estimatedOutput === 'object' ? (estimation.estimatedOutput as any)?.amount || JSON.stringify(estimation.estimatedOutput) : String(estimation.estimatedOutput);
+    } catch (estError) {
+      console.warn('[Swap Estimate Warning]', estError);
+    }
+
+    const result = await kit.swap({
+      from: { adapter, chain: chain as any, address: agent.wallet.address },
+      tokenIn: input.tokenIn.toUpperCase(),
+      tokenOut: input.tokenOut.toUpperCase(),
+      amountIn: input.amountIn.toFixed(6),
+      config: {
+        kitKey,
+        slippageBps: input.slippageBps ?? 100,
+      },
+    });
+
+    const replacer = (key: string, value: any) =>
+      typeof value === 'bigint' ? value.toString() : value;
+
+    await ctx.prisma.activityLog.create({
+      data: {
+        agentId: agent.id,
+        actionType: 'swap',
+        status: result.txHash ? 'success' : 'completed',
+        txHash: result.txHash || null,
+        payload: JSON.parse(
+          JSON.stringify(
+            {
+              tokenIn: input.tokenIn,
+              tokenOut: input.tokenOut,
+              amountIn: input.amountIn,
+              amountOut: result.amountOut,
+              chain,
+              swapResult: result,
+            },
+            replacer,
+          ),
+        ),
+      },
+    });
+
+    return JSON.stringify(
+      {
+        success: true,
+        txHash: result.txHash,
+        tokenIn: input.tokenIn.toUpperCase(),
+        tokenOut: input.tokenOut.toUpperCase(),
+        amountIn: input.amountIn,
+        amountOut: result.amountOut,
+        estimatedOutput,
+        explorerUrl: result.explorerUrl,
+        message: `Successfully swapped ${input.amountIn} ${input.tokenIn.toUpperCase()} to ${result.amountOut || input.tokenOut.toUpperCase()} on ${chain}.`,
+      },
+      replacer,
+    );
+  } catch (err: any) {
+    console.error('=================== [SWAP ERROR DETAILS] ===================');
+    console.error(err);
+    console.error('============================================================');
+    return JSON.stringify({
+      success: false,
+      error: err.message ?? 'Token swap failed.',
+      details: String(err),
+    });
+  }
+}
+

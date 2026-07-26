@@ -225,11 +225,13 @@ export const CORE_TOOLS: Anthropic.Tool[] = [
           type: 'object',
           description: 'The action config to execute when triggered.',
           properties: {
-            type: { type: 'string', enum: ['transfer'], description: 'Type of action.' },
-            amount: { type: 'number', description: 'Amount of tokens to move.' },
-            to: { type: 'string', description: 'Recipient wallet address (0x...).' },
+            type: { type: 'string', enum: ['transfer', 'swap'], description: 'Type of action.' },
+            amount: { type: 'number', description: 'Amount of tokens to move or swap.' },
+            to: { type: 'string', description: 'Recipient wallet address (0x...) for transfer actions.' },
+            fromToken: { type: 'string', description: 'Source token symbol (e.g. USDC) for swap actions.' },
+            toToken: { type: 'string', description: 'Target token symbol (e.g. EURC) for swap actions.' },
           },
-          required: ['type', 'amount', 'to'],
+          required: ['type', 'amount'],
         },
       },
       required: ['agentId', 'naturalRuleText', 'trigger', 'action'],
@@ -488,6 +490,39 @@ export const CORE_TOOLS: Anthropic.Tool[] = [
       required: ['agentId', 'serviceUrl'],
     },
   },
+  {
+    name: 'swap_tokens',
+    description:
+      'Swap tokens (such as USDC to EURC, or USDT to USDC) within an agent\'s vault wallet using Circle App Kit / Swap Kit. Use when the user asks to swap, exchange, trade, convert stablecoins, or perform token swaps.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        fromAgentId: {
+          type: 'string',
+          description: 'The database ID of the agent whose wallet will execute the swap.',
+        },
+        tokenIn: {
+          type: 'string',
+          description: 'The symbol of the token to swap from (e.g. "USDC", "EURC", "USDT", "WETH").',
+        },
+        tokenOut: {
+          type: 'string',
+          description: 'The symbol of the token to swap to (e.g. "EURC", "USDC", "USDT", "WETH").',
+        },
+        amountIn: {
+          type: 'number',
+          description: 'The amount of tokenIn to swap.',
+        },
+        chain: {
+          type: 'string',
+          description: 'The chain identifier to run the swap on (e.g. "Arc_Testnet", "Ethereum", "Base", "Arbitrum", "Solana"). Defaults to "Arc_Testnet".',
+        },
+        slippageBps: {
+          type: 'number',
+          description: 'Optional slippage tolerance in basis points (e.g. 100 for 1%, 300 for 3%). Defaults to 100.',
+        },
+      },
+      required: ['fromAgentId', 'tokenIn', 'tokenOut', 'amountIn'],
+    },
+  },
 ];
-
-

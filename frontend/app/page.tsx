@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApp } from "./context/AppContext";
+import { usePrivy } from "@privy-io/react-auth";
 import { ArrowRight, ShieldCheck, Compass, BarChart3, Coins, Sparkles, Send, User, Bot } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -19,8 +20,17 @@ export default function LandingPage() {
     },
   ]);
 
+  const { authenticated } = usePrivy();
+
+  // If user is authenticated, redirect automatically to dashboard
+  React.useEffect(() => {
+    if (authenticated) {
+      router.push("/dashboard");
+    }
+  }, [authenticated, router]);
+
   const handleLaunch = () => {
-    if (connectedWallet) {
+    if (authenticated || connectedWallet) {
       router.push("/dashboard");
     } else {
       router.push("/onboarding");

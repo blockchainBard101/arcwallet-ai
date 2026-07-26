@@ -2,7 +2,8 @@
 
 import React, { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useApp } from "../../../context/AppContext";
+import { useApp, getBackendUrl } from "../../../context/AppContext";
+import { usePrivy } from "@privy-io/react-auth";
 import {
   Bot,
   Sliders,
@@ -26,6 +27,7 @@ interface PageProps {
 export default function AgentRulesConsole({ params }: PageProps) {
   const router = useRouter();
   const { id } = use(params);
+  const { getAccessToken } = usePrivy();
   
   const { agents, rules, addRule, triggerToast } = useApp();
   const agent = agents.find((a) => a.id === id);
@@ -35,6 +37,7 @@ export default function AgentRulesConsole({ params }: PageProps) {
 
   // Visual Builder form states
   const [triggerType, setTriggerType] = useState("Balance Threshold");
+  const [isRecurring, setIsRecurring] = useState(false);
   const [conditionField, setConditionField] = useState("USDC Balance");
   const [conditionOperator, setConditionOperator] = useState(">");
   const [conditionValue, setConditionValue] = useState("1000");
@@ -114,7 +117,7 @@ export default function AgentRulesConsole({ params }: PageProps) {
   };
 
   // Deploy Rule
-  const handleDeployRule = (e: React.FormEvent) => {
+  const handleDeployRule = async (e: React.FormEvent) => {
     e.preventDefault();
     let finalRuleText = "";
     let finalTrigger = "";
@@ -134,12 +137,84 @@ export default function AgentRulesConsole({ params }: PageProps) {
       finalAction = nlpParsedResult.action;
     }
 
+    // Persist to backend database if authenticated
+    try {
+      const token = await getAccessToken();
+      
+      let parsedTrigger: any;
+      let parsedAction: any;
+
+      if (mode === "nlp" && nlpParsedResult) {
+        const nlpStr = nlpText.toLowerCase();
+        const tokenMatch = nlpStr.includes("eurc") ? "EURC" : "USDC";
+        const isBelow = nlpStr.includes("below") || nlpStr.includes("<") || nlpStr.includes("drop");
+        const valMatch = nlpStr.match(/\d+(\.\d+)?/);
+        const val = valMatch ? parseFloat(valMatch[0]) : 1;
+
+        parsedTrigger = {
+          type: "balance",
+          token: tokenMatch,
+          operator: isBelow ? "below" : "above",
+          value: val,
+        };
+
+        const isSwapAll = nlpStr.includes("all");
+        parsedAction = {
+          type: nlpStr.includes("swap") ? "swap" : "transfer",
+          amount: isSwapAll ? "all" : val,
+          fromToken: tokenMatch,
+          toToken: tokenMatch === "USDC" ? "EURC" : "USDC",
+          recurring: isRecurring,
+          to: nlpStr.match(/0x[a-fA-F0-9]{40}/)?.[0] || "",
+        };
+      } else {
+        parsedTrigger = {
+          type: "balance",
+          token: conditionField.includes("EURC") ? "EURC" : "USDC",
+          operator: conditionOperator === ">" ? "above" : conditionOperator === "<" ? "below" : "above",
+          value: parseFloat(conditionValue) || 1,
+        };
+
+        const isSwapAll = actionDetail.toLowerCase().includes("all");
+        parsedAction = {
+          type: actionType === "Swap Assets" || actionDetail.toLowerCase().includes("swap") ? "swap" : "transfer",
+          amount: isSwapAll ? "all" : (parseFloat(conditionValue) || 1),
+          fromToken: "USDC",
+          toToken: "EURC",
+          recurring: isRecurring,
+          to: actionDetail.includes("0x") ? actionDetail.match(/0x[a-fA-F0-9]{40}/)?.[0] || "" : "",
+        };
+      }
+
+      if (token) {
+        const res = await fetch(`${getBackendUrl()}/rules`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            agentId: agent.id,
+            naturalRuleText: finalRuleText,
+            trigger: parsedTrigger,
+            action: parsedAction,
+          }),
+        });
+        if (res.ok) {
+          triggerToast("Automation rule saved to backend scheduler!", "success");
+        }
+      }
+    } catch (err) {
+      console.warn("Backend rule persistence failed, using local context fallback:", err);
+    }
+
     addRule(agent.id, finalRuleText, finalTrigger, finalAction);
     
     // Clear forms & redirect
     setNlpText("");
     setNlpParsedResult(null);
     setSimCompleted(false);
+    triggerToast("Visual guardrail rule successfully deployed!", "success");
     router.push(`/agents/${agent.id}`);
   };
 
@@ -193,24 +268,24 @@ export default function AgentRulesConsole({ params }: PageProps) {
     <div className="flex flex-col gap-6 select-none relative h-full">
       
       {/* Header Toolbar */}
-      <div className="flex items-center justify-between border-b border-[#22252F] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#22252F] pb-4">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push(`/agents/${agent.id}`)}
-            className="p-2 rounded-xl bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-slate-400 hover:text-white transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div className="flex flex-col">
-            <h1 className="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
-              <Sliders className="w-5 h-5 text-neon-blue" />
+            <h1 className="text-lg sm:text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+              <Sliders className="w-5 h-5 text-neon-blue shrink-0" />
               Guardrail Rules Builder
             </h1>
-            <p className="text-xs text-slate-400">Configure automated logic triggers on your Circle sandbox wallet.</p>
+            <p className="text-[11px] sm:text-xs text-slate-400">Configure automated logic triggers on your Circle sandbox wallet.</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-[#15161C] p-1 rounded-xl border border-[#22252F]">
+        <div className="flex items-center gap-2 bg-[#15161C] p-1 rounded-xl border border-[#22252F] self-start sm:self-auto">
           <button
             onClick={() => setMode("visual")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -253,23 +328,37 @@ export default function AgentRulesConsole({ params }: PageProps) {
             {mode === "visual" && (
               <div className="flex flex-col gap-4">
                 
-                {/* Rule trigger group */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Trigger Class</label>
-                  <select
-                    value={triggerType}
-                    onChange={(e) => setTriggerType(e.target.value)}
-                    className="h-10 px-3 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
-                  >
-                    <option>Balance Threshold</option>
-                    <option>Price Deviation</option>
-                    <option>Cron Scheduler</option>
-                    <option>Gas Metric Alert</option>
-                  </select>
+                {/* Rule trigger & frequency group */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Trigger Class</label>
+                    <select
+                      value={triggerType}
+                      onChange={(e) => setTriggerType(e.target.value)}
+                      className="h-10 px-3 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
+                    >
+                      <option className="bg-[#090A0F] text-white">Balance Threshold</option>
+                      <option className="bg-[#090A0F] text-white">Price Deviation</option>
+                      <option className="bg-[#090A0F] text-white">Cron Scheduler</option>
+                      <option className="bg-[#090A0F] text-white">Gas Metric Alert</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Execution Frequency</label>
+                    <select
+                      value={isRecurring ? "recurring" : "one_time"}
+                      onChange={(e) => setIsRecurring(e.target.value === "recurring")}
+                      className="h-10 px-3 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50 font-semibold text-neon-cyan truncate"
+                    >
+                      <option value="one_time" className="bg-[#090A0F] text-white">One-Time Auto Action</option>
+                      <option value="recurring" className="bg-[#090A0F] text-white">Recurring Execution</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Condition setup fields */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Condition Field</label>
                     <select
@@ -277,10 +366,10 @@ export default function AgentRulesConsole({ params }: PageProps) {
                       onChange={(e) => setConditionField(e.target.value)}
                       className="h-10 px-3 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
                     >
-                      <option>USDC Balance</option>
-                      <option>EURC Balance</option>
-                      <option>EURC Oracle Price</option>
-                      <option>RPC Gas Limit</option>
+                      <option className="bg-[#090A0F] text-white">USDC Balance</option>
+                      <option className="bg-[#090A0F] text-white">EURC Balance</option>
+                      <option className="bg-[#090A0F] text-white">EURC Oracle Price</option>
+                      <option className="bg-[#090A0F] text-white">RPC Gas Limit</option>
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -290,9 +379,9 @@ export default function AgentRulesConsole({ params }: PageProps) {
                       onChange={(e) => setConditionOperator(e.target.value)}
                       className="h-10 px-3 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
                     >
-                      <option>&gt;</option>
-                      <option>&lt;</option>
-                      <option>==</option>
+                      <option className="bg-[#090A0F] text-white">&gt;</option>
+                      <option className="bg-[#090A0F] text-white">&lt;</option>
+                      <option className="bg-[#090A0F] text-white">==</option>
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -307,17 +396,24 @@ export default function AgentRulesConsole({ params }: PageProps) {
                 </div>
 
                 {/* Action builder */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Action Type</label>
                     <select
                       value={actionType}
-                      onChange={(e) => setActionType(e.target.value)}
+                      onChange={(e) => {
+                        setActionType(e.target.value);
+                        if (e.target.value === "Swap Assets") {
+                          setActionDetail("Swap all USDC to EURC");
+                        } else if (e.target.value === "Transfer USDC") {
+                          setActionDetail("Transfer 10 USDC to 0x71C7...976F");
+                        }
+                      }}
                       className="h-10 px-3 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
                     >
-                      <option>Swap Assets</option>
-                      <option>Send Alert</option>
-                      <option>Transfer USDC</option>
+                      <option className="bg-[#090A0F] text-white">Swap Assets</option>
+                      <option className="bg-[#090A0F] text-white">Transfer USDC</option>
+                      <option className="bg-[#090A0F] text-white">Send Alert</option>
                     </select>
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -326,6 +422,7 @@ export default function AgentRulesConsole({ params }: PageProps) {
                       type="text"
                       value={actionDetail}
                       onChange={(e) => setActionDetail(e.target.value)}
+                      placeholder="e.g. Swap all USDC to EURC"
                       className="h-10 px-3 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
                     />
                   </div>
@@ -353,13 +450,13 @@ export default function AgentRulesConsole({ params }: PageProps) {
                   />
                 </div>
 
-                <div className="flex justify-between items-center mt-1">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mt-1">
                   <span className="text-[9px] text-slate-500">Press parse to compile script keywords into state models.</span>
                   <button
                     type="button"
                     onClick={handleNLPParse}
                     disabled={nlpParsing || !nlpText.trim()}
-                    className="h-8 px-4 rounded-lg bg-[#15161C] border border-[#22252F] hover:bg-[#22252F] text-[10px] font-bold text-white transition-all cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto h-8 px-4 rounded-lg bg-[#15161C] border border-[#22252F] hover:bg-[#22252F] text-[10px] font-bold text-white transition-all cursor-pointer disabled:opacity-50"
                   >
                     {nlpParsing ? "Analyzing Script..." : "Compile Script"}
                   </button>
@@ -371,7 +468,7 @@ export default function AgentRulesConsole({ params }: PageProps) {
                       <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
                       Parser Compilation Success
                     </span>
-                    <div className="grid grid-cols-2 gap-3 border-t border-b border-[#22252F] py-2.5 my-0.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-b border-[#22252F] py-2.5 my-0.5">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-[8px] text-slate-500 font-bold uppercase">Extracted Trigger</span>
                         <span className="text-[10px] font-semibold text-white font-mono">{nlpParsedResult.trigger}</span>
@@ -392,7 +489,7 @@ export default function AgentRulesConsole({ params }: PageProps) {
             )}
 
             {/* Form actions */}
-            <div className="flex justify-end gap-3 mt-4 border-t border-[#22252F] pt-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-4 border-t border-[#22252F] pt-4">
               <button
                 type="button"
                 onClick={() => {
@@ -401,15 +498,14 @@ export default function AgentRulesConsole({ params }: PageProps) {
                   const act = mode === "visual" ? actionDetail : (nlpParsedResult?.action || "NLP Action");
                   handleRunSimulation(ruleTxt, trig, act);
                 }}
-                className="h-10 px-5 rounded-xl border border-neon-cyan/20 bg-neon-cyan/5 text-neon-cyan hover:bg-neon-cyan/10 font-bold text-xs cursor-pointer transition-all flex items-center gap-1.5"
+                className="w-full sm:w-auto h-10 px-5 rounded-xl border border-neon-cyan/20 bg-neon-cyan/5 text-neon-cyan hover:bg-neon-cyan/10 font-bold text-xs cursor-pointer transition-all flex items-center justify-center gap-1.5"
               >
                 <Play className="w-4 h-4" />
                 Run Simulator
               </button>
               <button
                 type="submit"
-                disabled={!simCompleted}
-                className="h-10 px-6 rounded-xl bg-neon-blue text-slate-950 font-bold text-xs cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto h-10 px-6 rounded-xl bg-neon-blue text-slate-950 font-bold text-xs cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all"
               >
                 Deploy visual guardrail
               </button>

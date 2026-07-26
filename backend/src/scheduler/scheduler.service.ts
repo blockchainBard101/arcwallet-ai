@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { CircleService } from '../circle/circle.service';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { REDIS_CLIENT } from '../redis/redis.module';
+import Redis from 'ioredis';
 
 @Injectable()
 export class SchedulerService {
@@ -21,6 +23,7 @@ export class SchedulerService {
     private readonly prisma: PrismaService,
     private readonly circleService: CircleService,
     private readonly subscriptionService: SubscriptionService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {}
 
   /**
@@ -241,11 +244,35 @@ export class SchedulerService {
             },
           },
         });
+        // Deactivate failing rule so it doesn't loop infinitely
+        await this.prisma.rule.update({
+          where: { id: rule.id },
+          data: { status: 'failed' },
+        });
       }
     } else if (action.type === 'swap') {
       const fromToken = action.fromToken || 'USDC';
       const toToken = action.toToken || 'EURC';
-      const amount = parseFloat(action.amount);
+      
+      let amount = 0;
+      if (action.amount === 'all' || (typeof action.amount === 'string' && action.amount.toLowerCase() === 'all')) {
+        try {
+          const balances = await this.circleService.getWalletTokenBalance(agent.walletId);
+          const fromBal = balances.find((b: any) => b.token?.symbol?.toLowerCase().includes(fromToken.toLowerCase()));
+          amount = fromBal?.amount ? parseFloat(fromBal.amount) : 0;
+          this.logger.log(`"Swap All" requested for ${fromToken}. Live vault balance fetched: ${amount}`);
+        } catch (err: any) {
+          this.logger.warn(`Could not fetch live balance for ${fromToken}, defaulting to 1: ${err.message}`);
+          amount = 1;
+        }
+      } else {
+        amount = parseFloat(action.amount);
+      }
+
+      if (amount <= 0) {
+        this.logger.warn(`Swap amount for agent ${agent.name} is ${amount}. Skipping execution.`);
+        return;
+      }
 
       this.logger.log(`Rule trigger action: Swap ${amount} ${fromToken} to ${toToken}`);
 
@@ -287,10 +314,12 @@ export class SchedulerService {
             },
           });
 
-          await this.prisma.rule.update({
-            where: { id: rule.id },
-            data: { status: 'inactive' },
-          });
+          if (!action.recurring) {
+            await this.prisma.rule.update({
+              where: { id: rule.id },
+              data: { status: 'inactive' },
+            });
+          }
 
           this.logger.log(`Rule action swap executed successfully. Tx: ${result.txHash}`);
         } catch (err: any) {
@@ -307,6 +336,10 @@ export class SchedulerService {
                 error: err.message,
               },
             },
+          });
+          await this.prisma.rule.update({
+            where: { id: rule.id },
+            data: { status: 'failed' },
           });
         }
       } else {

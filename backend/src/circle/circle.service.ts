@@ -89,6 +89,23 @@ export class CircleService {
   }
 
   /**
+   * List transactions for a specific Circle wallet.
+   * @param walletIds Array of Circle wallet IDs
+   * @returns list of transaction objects from Circle API
+   */
+  async listTransactions(walletIds: string[]): Promise<any[]> {
+    try {
+      const response = await this.client.listTransactions({
+        walletIds,
+      });
+      return response.data?.transactions ?? [];
+    } catch (error) {
+      this.logger.error(`Failed to list Circle transactions: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
    * Send USDC autonomously from an agent's developer-controlled wallet.
    * Signed server-side using the entity secret — no user confirmation required.
    * @param walletId  Circle wallet ID of the sending agent

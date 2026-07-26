@@ -191,16 +191,38 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
     loadChatHistory();
   }, [id, authenticated, agent]);
 
-  // Initialize logs
+  // Initialize logs & fetch real activity history from backend / Circle API
   useEffect(() => {
     if (!agent) return;
-    setLogs([
+    const initial = [
       `[SYSTEM] [${new Date().toLocaleTimeString()}] Cognitive engine ${agent.model} initialized.`,
       `[SYSTEM] [${new Date().toLocaleTimeString()}] Secure bridge connection established to Circle vault ${agent.wallet.slice(0, 10)}...`,
       `[DAEMON] [${new Date().toLocaleTimeString()}] Loaded ${agentRules.length} active automation rules.`,
       `[DAEMON] [${new Date().toLocaleTimeString()}] Listening for RPC events on Arc L1 blockchain...`,
       `[DAEMON] [${new Date().toLocaleTimeString()}] Polling wallet balance. Current status: ${agent.status.toUpperCase()}.`,
-    ]);
+    ];
+    setLogs(initial);
+
+    // Fetch real transaction & activity history from backend
+    const fetchHistory = async () => {
+      try {
+        if (!agent.wallet || agent.wallet === "No Wallet") return;
+        const res = await fetch(`${getBackendUrl()}/stats/${agent.wallet}?timeframe=1w`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.transactions && Array.isArray(data.transactions) && data.transactions.length > 0) {
+            const historyLogs = data.transactions.map((tx: any) => {
+              const ts = new Date(tx.timestamp).toLocaleTimeString();
+              return `[TRANSACTION] [${ts}] ${tx.title}: ${tx.description || tx.value} (${tx.status.toUpperCase()})`;
+            });
+            setLogs((prev) => [...prev, ...historyLogs]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load agent transaction history:", err);
+      }
+    };
+    fetchHistory();
   }, [agent]);
 
   // Live log generator simulation
@@ -863,11 +885,16 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
           {/* Quick numbers grid */}
           <div className="grid grid-cols-2 gap-4 mt-2">
             <div className="col-span-2 p-3.5 rounded-xl bg-[#090A0F]/40 border border-neon-blue/10 flex items-center justify-between">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Vault Balance</span>
-                <span className="text-sm font-extrabold text-white font-mono">
-                  {agent.balance.toLocaleString()} {agent.token}
-                </span>
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Vault Balances</span>
+                <div className="flex items-center gap-3 font-mono">
+                  <span className="text-sm font-extrabold text-white">
+                    {agent.balance.toLocaleString()} USDC
+                  </span>
+                  <span className="text-sm font-extrabold text-neon-cyan">
+                    {(agent.balanceEURC ?? 0).toLocaleString()} EURC
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => openFundModal()}

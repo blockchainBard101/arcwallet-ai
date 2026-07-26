@@ -46,8 +46,8 @@ export default function AgentsPage() {
     setModalOpen(false);
   };
 
-  // Scoped stats
-  const totalBalance = agents.reduce((acc, curr) => acc + curr.balance, 0);
+  // Scoped stats (including EURC converted to USD equivalent ~1.08)
+  const totalBalance = agents.reduce((acc, curr) => acc + curr.balance + ((curr.balanceEURC ?? 0) * 1.08), 0);
   const activeRulesCount = Object.values(rules).reduce((acc, list) => acc + list.filter(r => r.active).length, 0);
   const avgSuccessRate = agents.length > 0 ? (agents.reduce((acc, curr) => acc + curr.successRate, 0) / agents.length).toFixed(1) : "100";
 
@@ -227,13 +227,16 @@ export default function AgentsPage() {
                 </div>
 
                 {/* Card bottom: metrics & management controls */}
-                <div className="flex items-end justify-between border-t border-[#22252F] pt-4 mt-4">
-                  <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-t border-[#22252F] pt-4 mt-4">
+                  <div className="flex flex-wrap gap-4">
                     <div className="flex flex-col">
                       <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Vault Balance</span>
-                      <span className="text-sm font-bold text-white font-mono mt-0.5">
-                        {agent.balance.toLocaleString()} {agent.token}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5 font-mono text-xs font-bold">
+                        <span className="text-white">{agent.balance.toLocaleString()} USDC</span>
+                        {!!agent.balanceEURC && agent.balanceEURC > 0 && (
+                          <span className="text-neon-cyan">• {agent.balanceEURC.toLocaleString()} EURC</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-col border-l border-[#22252F] pl-4">
                       <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Rules Active</span>
@@ -243,7 +246,7 @@ export default function AgentsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
                     <button
                       onClick={(e) => { e.stopPropagation(); router.push(`/agents/${agent.id}/dashboard`); }}
                       className="p-2 rounded-lg bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-slate-400 hover:text-white transition-colors cursor-pointer"

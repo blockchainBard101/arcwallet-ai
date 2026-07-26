@@ -31,6 +31,7 @@ export interface Agent {
   status: "active" | "idle" | "paused";
   wallet: string;
   balance: number;
+  balanceEURC?: number;
   token: string;
   created: string;
   rulesCount: number;
@@ -270,19 +271,46 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
           });
           if (res.ok) {
             const data = await res.json();
-            const mappedAgents = data.map((a: any) => ({
-              id: a.id,
-              name: a.name,
-              model: a.configuration?.model || "Claude 3.5 Sonnet",
-              status: a.status || "active",
-              wallet: a.wallet?.address || "No Wallet",
-              balance: a.balances?.[0]?.amount ? Number(a.balances[0].amount) : 0,
-              token: "USDC",
-              created: a.createdAt?.split("T")[0] || new Date().toISOString().split("T")[0],
-              rulesCount: a.configuration?.rulesCount || 0,
-              successRate: 100,
-              gasSpent: 0,
-            }));
+            const mappedAgents = data.map((a: any) => {
+              const usdcObj = a.balances?.find((b: any) =>
+                b.token?.symbol?.toLowerCase().includes("usdc")
+              );
+              const eurcObj = a.balances?.find((b: any) =>
+                b.token?.symbol?.toLowerCase().includes("eurc")
+              );
+
+              const activeRules = a.rules?.filter((r: any) => r.status === 'active') ?? [];
+
+              return {
+                id: a.id,
+                name: a.name,
+                model: a.configuration?.model || "Claude 3.5 Sonnet",
+                status: a.status || "active",
+                wallet: a.wallet?.address || "No Wallet",
+                balance: usdcObj?.amount ? Number(usdcObj.amount) : 0,
+                balanceEURC: eurcObj?.amount ? Number(eurcObj.amount) : 0,
+                token: "USDC",
+                created: a.createdAt?.split("T")[0] || new Date().toISOString().split("T")[0],
+                rulesCount: activeRules.length,
+                successRate: 100,
+                gasSpent: 0,
+              };
+            });
+
+            // Sync rules per agent
+            const rulesMap: Record<string, any[]> = {};
+            data.forEach((a: any) => {
+              rulesMap[a.id] = (a.rules || []).map((r: any) => ({
+                id: r.id,
+                text: r.naturalRuleText,
+                trigger: "Balance Threshold",
+                action: "Swap/Transfer",
+                active: r.status === "active",
+                lastTriggered: r.updatedAt ? new Date(r.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Never",
+              }));
+            });
+            setRules(rulesMap);
+
             setAgents(mappedAgents);
           }
         } catch (err) {
@@ -292,6 +320,13 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
         }
       };
       loadAgents();
+
+      // Automatically refresh balances every 10 seconds without needing manual page refreshes
+      const intervalId = setInterval(() => {
+        loadAgents();
+      }, 10000);
+
+      return () => clearInterval(intervalId);
     } else {
       setAgents(INITIAL_AGENTS);
       setIsLoadingAgents(false);

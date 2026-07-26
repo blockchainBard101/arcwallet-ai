@@ -13,6 +13,10 @@ import { RiskModule } from './risk/risk.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { RulesController } from './rules/rules.controller';
+import { RedisModule } from './redis/redis.module';
+
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -26,12 +30,18 @@ import { SubscriptionModule } from './subscription/subscription.module';
     ScheduleModule.forRoot(),
     SchedulerModule,
     SubscriptionModule,
+    RedisModule,
+    BullModule.forRoot({
+      connection: {
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+      },
+    }),
     ThrottlerModule.forRoot([{
       ttl: 60000,
       limit: 100,
     }]),
   ],
-  controllers: [AppController],
+  controllers: [AppController, RulesController],
   providers: [
     AppService,
     {

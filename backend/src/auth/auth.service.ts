@@ -61,8 +61,16 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      this.logger.error(`Failed to sync Privy user: ${error.message}`, error.stack);
-      throw error;
+      this.logger.warn(`Could not fetch Privy remote profile for ${privyUserId}: ${error.message}. Falling back to DB user record.`);
+      // Fallback to local DB record so temporary Privy API network outages don't block the user
+      return await this.prisma.user.upsert({
+        where: { id: privyUserId },
+        update: {},
+        create: {
+          id: privyUserId,
+          email: `${privyUserId}@placeholder.privy.io`,
+        },
+      });
     }
   }
 }

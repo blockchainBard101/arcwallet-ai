@@ -80,6 +80,7 @@ export class AgentService {
       where: { userId },
       include: {
         wallet: true,
+        rules: true,
       },
     });
 

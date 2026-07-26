@@ -1,12 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
+import { CircleService } from './circle/circle.service';
 
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
   private readonly blockTimestampCache = new Map<string, string>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly circleService?: CircleService,
+  ) {}
 
   getHello(): string {
     return 'Hello World!';
@@ -51,25 +55,71 @@ export class AppService {
 
       const cleanAddr = address.toLowerCase().replace('0x', '');
       const dataPayload = `0x70a08231000000000000000000000000${cleanAddr.padStart(64, '0')}`;
-      const erc20Res = await fetch(rpcUrl, {
+
+      // 1a. Query USDC ERC20 (0x3600...)
+      const usdcRes = await fetch(rpcUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jsonrpc: '2.0',
           method: 'eth_call',
-          params: [
-            {
-              to: '0x3600000000000000000000000000000000000000',
-              data: dataPayload,
-            },
-            'latest',
-          ],
+          params: [{ to: '0x3600000000000000000000000000000000000000', data: dataPayload }, 'latest'],
           id: 2,
         }),
       });
-      const erc20Data = await erc20Res.json();
-      if (erc20Data.result && erc20Data.result !== '0x') {
-        erc20Balance = Number(BigInt(erc20Data.result)) / 1e6;
+      const usdcData = await usdcRes.json();
+      if (usdcData.result && usdcData.result !== '0x') {
+        erc20Balance += Number(BigInt(usdcData.result)) / 1e6;
+      }
+
+      // 1b. Query EURC ERC20 (0x8080000000000000000000000000000000000000 or Circle EURC)
+      try {
+        const eurcRes = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'eth_call',
+            params: [{ to: '0x8080000000000000000000000000000000000000', data: dataPayload }, 'latest'],
+            id: 22,
+          }),
+        });
+        const eurcData = await eurcRes.json();
+        if (eurcData.result && eurcData.result !== '0x') {
+          // Multiply EURC by ~1.08 exchange rate to USD
+          erc20Balance += (Number(BigInt(eurcData.result)) / 1e6) * 1.08;
+        }
+      } catch (e) {
+        // Ignored if contract call fails
+      }
+
+      // 1c. If address belongs to an agent wallet, check if circleWalletId is in configuration
+      try {
+        const walletRecord = await this.prisma.wallet.findUnique({
+          where: { address },
+          include: { agents: true },
+        });
+        const circleWalletId = walletRecord?.agents?.[0]?.configuration ? (walletRecord.agents[0].configuration as any).circleWalletId : null;
+        if (circleWalletId && this.circleService) {
+          const circleBal = await this.circleService.getWalletTokenBalance(circleWalletId);
+          if (Array.isArray(circleBal)) {
+            let circleTotalErc20 = 0;
+            for (const b of circleBal) {
+              const amount = parseFloat(b.amount || '0');
+              const symbol = b.token?.symbol?.toUpperCase() || '';
+              if (symbol.includes('USDC')) {
+                circleTotalErc20 += amount;
+              } else if (symbol.includes('EURC')) {
+                circleTotalErc20 += amount * 1.08;
+              }
+            }
+            if (circleTotalErc20 > 0) {
+              erc20Balance = circleTotalErc20;
+            }
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Could not fetch Circle balances for wallet ${address}: ${err.message}`);
       }
 
       const txCountRes = await fetch(rpcUrl, {
@@ -92,9 +142,41 @@ export class AppService {
 
     const portfolioValue = nativeBalance + erc20Balance;
 
-    // 2. Query real ERC-20 transfer logs
+    // 2. Query real ERC-20 transfer logs & Circle API
     let realTxs: any[] = [];
     let fetchedFromExplorer = false;
+
+    // 2a. Query Circle API for transactions if this is a Circle Wallet
+    try {
+      const walletRecord = await this.prisma.wallet.findUnique({
+        where: { address },
+        include: { agents: true },
+      });
+      const circleWalletId = walletRecord?.agents?.[0]?.configuration ? (walletRecord.agents[0].configuration as any).circleWalletId : null;
+      if (circleWalletId && this.circleService) {
+        const circleTxs = await this.circleService.listTransactions([circleWalletId]);
+        if (Array.isArray(circleTxs) && circleTxs.length > 0) {
+          realTxs = circleTxs.map((ctx: any, idx: number) => {
+            const amt = parseFloat(ctx.amounts?.[0] || '0');
+            const isOut = ctx.walletId === circleWalletId;
+            return {
+              id: ctx.id || `circle-tx-${idx}`,
+              type: ctx.transactionType?.toLowerCase() === 'swap' ? 'swap' : 'transfer',
+              title: ctx.transactionType === 'INBOUND' ? 'Bridge Deposit' : 'Circle Transfer',
+              description: `${ctx.state || 'COMPLETE'} - ${amt} USDC`,
+              wallet: address,
+              status: ctx.state === 'COMPLETE' ? 'success' : 'pending',
+              value: `${amt.toFixed(2)} USDC`,
+              timestamp: ctx.createDate || new Date().toISOString(),
+            };
+          });
+          fetchedFromExplorer = true;
+          this.logger.log(`Fetched ${realTxs.length} transactions directly from Circle API.`);
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not fetch Circle transactions: ${err.message}`);
+    }
 
     let explorerData: any = null;
     const maxRetries = 5;
