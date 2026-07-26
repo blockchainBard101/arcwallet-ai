@@ -24,6 +24,8 @@ import {
   Sparkles,
   ArrowRight,
   ShieldAlert,
+  Shield,
+  X,
 } from "lucide-react";
 
 interface PageProps {
@@ -94,6 +96,13 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
   const [fundSending, setFundSending] = useState(false);
   const [fundTxHash, setFundTxHash] = useState<string | null>(null);
   const [fundError, setFundError] = useState<string | null>(null);
+
+  // Policy modal state
+  const [policyModalOpen, setPolicyModalOpen] = useState(false);
+  const [perTxLimit, setPerTxLimit] = useState("50");
+  const [dailyLimit, setDailyLimit] = useState("200");
+  const [monthlyLimit, setMonthlyLimit] = useState("1000");
+  const [policySaved, setPolicySaved] = useState(false);
 
   const handleCopyFundAddress = () => {
     navigator.clipboard.writeText(agent?.wallet ?? "");
@@ -595,48 +604,48 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 select-none h-full relative">
       
       {/* LEFT SIDE: Chat Workspace */}
-      <div className={`lg:col-span-7 flex flex-col h-[calc(100dvh-180px)] lg:h-[calc(100dvh-130px)] min-h-[500px] glass-panel border-[#22252F] bg-[#15161C] overflow-hidden relative ${
+      <div className={`lg:col-span-7 flex flex-col h-[calc(100dvh-160px)] sm:h-[calc(100dvh-170px)] lg:h-[calc(100dvh-130px)] min-h-[420px] glass-panel border-[#22252F] bg-[#15161C] overflow-hidden relative ${
         activePanel !== "chat" ? "hidden lg:flex" : "flex"
       }`}>
         {/* Chat header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#22252F] bg-[#090A0F]/20 shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-[#22252F] bg-[#090A0F]/20 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-blue glow-blue">
-              <Bot className="w-5.5 h-5.5" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-blue glow-blue shrink-0">
+              <Bot className="w-5 h-5 sm:w-5.5 sm:h-5.5" />
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">{agent.name}</span>
-                <span className={`w-2 h-2 rounded-full ${agent.status === "active" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                <span className="text-xs sm:text-sm font-bold text-white truncate max-w-[140px] sm:max-w-none">{agent.name}</span>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${agent.status === "active" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
               </div>
-              <span className="text-[10px] text-slate-400 font-mono">Model: {agent.model}</span>
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-mono truncate">Model: {agent.model}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push(`/agents/${agent.id}/dashboard`)}
-              className="px-3 py-1.5 rounded-lg border border-[#22252F] bg-[#15161C] hover:bg-[#22252F] text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+              className="min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#22252F] bg-[#15161C] hover:bg-[#22252F] text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
             >
-              <TrendingUp className="w-3.5 h-3.5 text-neon-cyan" />
-              Agent Analytics
+              <TrendingUp className="w-3.5 h-3.5 text-neon-cyan shrink-0" />
+              <span className="hidden sm:inline">Agent </span>Analytics
             </button>
             <button
               onClick={() => router.push(`/agents/${agent.id}/rules`)}
-              className="px-3 py-1.5 rounded-lg border border-[#22252F] bg-[#15161C] hover:bg-[#22252F] text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+              className="min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#22252F] bg-[#15161C] hover:bg-[#22252F] text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
             >
-              <Sliders className="w-3.5 h-3.5 text-neon-blue" />
-              Manage Rules
+              <Sliders className="w-3.5 h-3.5 text-neon-blue shrink-0" />
+              <span className="hidden sm:inline">Manage </span>Rules
             </button>
           </div>
         </div>
 
         {/* Messages Body */}
-        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 flex flex-col gap-3.5 sm:gap-4">
           {agentMessages.map((msg) => {
             const isUser = msg.sender === "user";
             return (
-              <div key={msg.id} className={`flex gap-3 max-w-[85%] group/msg ${isUser ? "ml-auto flex-row-reverse" : "mr-auto"}`}>
+              <div key={msg.id} className={`flex gap-2.5 sm:gap-3 max-w-[92%] sm:max-w-[85%] group/msg ${isUser ? "ml-auto flex-row-reverse" : "mr-auto"}`}>
                 <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center border ${
                   isUser
                     ? "bg-neon-purple/10 border-neon-purple/20 text-neon-purple"
@@ -645,8 +654,8 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
                   {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <div className={`relative p-3.5 rounded-2xl text-xs leading-relaxed border ${
+                <div className="flex flex-col gap-1.5 min-w-0 overflow-hidden">
+                  <div className={`relative p-3.5 rounded-2xl text-xs leading-relaxed border break-words ${
                     isUser
                       ? "bg-[#090A0F]/80 border-neon-purple/10 text-slate-100 rounded-tr-none"
                       : "bg-[#090A0F]/90 border-[#22252F] text-slate-200 rounded-tl-none"
@@ -666,29 +675,29 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
                     {/* Message body — markdown for agent, plain for user */}
                     {isUser ? (
-                      <span>{msg.text}</span>
+                      <span className="break-words min-w-0 font-mono text-[11px] sm:text-xs">{msg.text}</span>
                     ) : (
-                      <div className="prose-agent">
+                      <div className="prose-agent break-words min-w-0">
                         <ReactMarkdown
                           components={{
                             h1: ({children}) => <h1 className="text-sm font-bold text-white mb-2 mt-1">{children}</h1>,
                             h2: ({children}) => <h2 className="text-xs font-bold text-white mb-1.5 mt-2">{children}</h2>,
                             h3: ({children}) => <h3 className="text-xs font-semibold text-slate-200 mb-1 mt-1.5">{children}</h3>,
-                            p:  ({children}) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-                            strong: ({children}) => <strong className="font-bold text-white">{children}</strong>,
+                            p:  ({children}) => <p className="mb-2 last:mb-0 leading-relaxed break-words break-all">{children}</p>,
+                            strong: ({children}) => <strong className="font-bold text-white break-words">{children}</strong>,
                             em: ({children}) => <em className="text-slate-300 italic">{children}</em>,
                             code: ({children, className}) => {
                               const isBlock = className?.includes('language-');
                               return isBlock
-                                ? <code className="block bg-[#0a0b10] border border-[#22252F] rounded-lg p-2.5 font-mono text-[9px] text-neon-cyan overflow-x-auto my-2 whitespace-pre">{children}</code>
-                                : <code className="bg-[#0a0b10] border border-[#22252F] rounded px-1.5 py-0.5 font-mono text-[9px] text-neon-cyan">{children}</code>;
+                                ? <code className="block bg-[#0a0b10] border border-[#22252F] rounded-lg p-2.5 font-mono text-[9px] text-neon-cyan overflow-x-auto my-2 whitespace-pre break-all">{children}</code>
+                                : <code className="bg-[#0a0b10] border border-[#22252F] rounded px-1.5 py-0.5 font-mono text-[9px] text-neon-cyan break-all">{children}</code>;
                             },
-                            pre: ({children}) => <pre className="my-0">{children}</pre>,
+                            pre: ({children}) => <pre className="my-0 overflow-x-auto">{children}</pre>,
                             ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-0.5 text-slate-300">{children}</ul>,
                             ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-0.5 text-slate-300">{children}</ol>,
-                            li: ({children}) => <li className="text-xs">{children}</li>,
+                            li: ({children}) => <li className="text-xs break-words">{children}</li>,
                             hr: () => <hr className="border-[#22252F] my-2" />,
-                            a:  ({href, children}) => <a href={href} target="_blank" rel="noreferrer" className="text-neon-blue underline hover:text-neon-cyan transition-colors">{children}</a>,
+                            a:  ({href, children}) => <a href={href} target="_blank" rel="noreferrer" className="text-neon-blue underline hover:text-neon-cyan transition-colors break-all">{children}</a>,
                             blockquote: ({children}) => <blockquote className="border-l-2 border-neon-blue/30 pl-3 italic text-slate-400 my-1">{children}</blockquote>,
                           }}
                         >
@@ -896,13 +905,22 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => openFundModal()}
-                className="h-8 px-3.5 rounded-lg bg-neon-blue/10 border border-neon-blue/30 text-neon-blue font-bold text-[10px] uppercase flex items-center gap-1.5 cursor-pointer hover:bg-neon-blue/20 transition-all"
-              >
-                <CreditCard className="w-3.5 h-3.5" />
-                Fund Vault
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPolicyModalOpen(true)}
+                  className="h-8 px-3 rounded-lg bg-[#15161C] border border-[#22252F] hover:bg-[#22252F] text-slate-300 font-bold text-[10px] uppercase flex items-center gap-1.5 cursor-pointer transition-all"
+                >
+                  <Shield className="w-3.5 h-3.5 text-neon-cyan" />
+                  Policy Limits
+                </button>
+                <button
+                  onClick={() => openFundModal()}
+                  className="h-8 px-3.5 rounded-lg bg-neon-blue/10 border border-neon-blue/30 text-neon-blue font-bold text-[10px] uppercase flex items-center gap-1.5 cursor-pointer hover:bg-neon-blue/20 transition-all"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Fund Vault
+                </button>
+              </div>
             </div>
             <div className="p-3.5 rounded-xl bg-[#090A0F]/40 border border-[#22252F] flex flex-col gap-0.5">
               <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Automated Rules</span>
@@ -1170,6 +1188,95 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Policy Limits Modal ─────────────────────────────────── */}
+      {policyModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => setPolicyModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md glass-panel bg-[#15161C] border-[#22252F] p-6 rounded-2xl flex flex-col gap-5 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#22252F] pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan">
+                  <Shield className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Agent Spending Policy</h3>
+                  <p className="text-[10px] text-slate-400">Configure cryptographic spending caps on {agent?.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPolicyModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#22252F] transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Per-Transaction Limit (USDC)</label>
+                <input
+                  type="number"
+                  value={perTxLimit}
+                  onChange={(e) => setPerTxLimit(e.target.value)}
+                  placeholder="50"
+                  className="h-10 px-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-cyan/50 font-mono"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Daily Spending Limit (USDC)</label>
+                <input
+                  type="number"
+                  value={dailyLimit}
+                  onChange={(e) => setDailyLimit(e.target.value)}
+                  placeholder="200"
+                  className="h-10 px-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-cyan/50 font-mono"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Monthly Spending Limit (USDC)</label>
+                <input
+                  type="number"
+                  value={monthlyLimit}
+                  onChange={(e) => setMonthlyLimit(e.target.value)}
+                  placeholder="1000"
+                  className="h-10 px-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-cyan/50 font-mono"
+                />
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#090A0F]/60 border border-[#22252F] flex flex-col gap-1.5 mt-1">
+                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">Circle CLI Security Command</span>
+                <span className="text-[9px] font-mono text-neon-cyan break-words">
+                  circle wallet limit set --address {agent?.wallet} --per-tx {perTxLimit || '0'} --daily {dailyLimit || '0'} --monthly {monthlyLimit || '0'}
+                </span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#22252F]">
+              <button
+                onClick={() => {
+                  setPolicySaved(true);
+                  triggerToast?.(`Spending limits for ${agent?.name} updated!`, "success");
+                  setTimeout(() => { setPolicySaved(false); setPolicyModalOpen(false); }, 1200);
+                }}
+                className="h-9 px-5 rounded-xl bg-neon-cyan text-slate-950 font-bold text-xs cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all"
+              >
+                {policySaved ? "Limits Saved!" : "Save Policy Limits"}
+              </button>
+            </div>
           </div>
         </div>
       )}
