@@ -565,298 +565,298 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto flex flex-col gap-8 pb-16">
-        {/* Hero Banner */}
-        <div className="glass-panel p-8 relative overflow-hidden bg-gradient-to-r from-[#11131F] via-[#0D101C] to-[#15192C] border-[#22252F] flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="absolute -top-24 -right-24 w-72 h-72 bg-neon-blue/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-neon-cyan/5 rounded-full blur-3xl pointer-events-none" />
+    <div className="max-w-7xl mx-auto flex flex-col gap-5 sm:gap-8 pb-16 px-1 sm:px-0">
+      {/* Hero Banner */}
+      <div className="glass-panel p-5 sm:p-8 relative overflow-hidden bg-gradient-to-r from-[#11131F] via-[#0D101C] to-[#15192C] border-[#22252F] flex flex-col md:flex-row justify-between items-start md:items-center gap-5 sm:gap-6 rounded-2xl">
+        <div className="absolute -top-24 -right-24 w-72 h-72 bg-neon-blue/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-neon-cyan/5 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="flex flex-col gap-3 max-w-2xl z-10">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-neon-blue/10 border border-neon-blue/30 text-neon-cyan text-[11px] font-mono font-semibold uppercase tracking-wider">
-                Circle Agent Marketplace
-              </span>
-              <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-mono font-bold uppercase">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                40 SERVICES &middot; 636 ENDPOINTS
-              </span>
-            </div>
-            <h1 className="text-3xl font-extrabold text-white tracking-tight">
-              Discover what your agent can do.
-            </h1>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Browse the curated catalog of x402-enabled APIs accepting micro-payments directly from your agent's USDC vault.
-              No API keys or checkout pages — your agent pays per call on-chain.
-            </p>
+        <div className="flex flex-col gap-2.5 sm:gap-3 max-w-2xl z-10">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full bg-neon-blue/10 border border-neon-blue/30 text-neon-cyan text-[10px] sm:text-[11px] font-mono font-semibold uppercase tracking-wider">
+              Circle Agent Marketplace
+            </span>
+            <span className="flex items-center gap-1 text-[10px] sm:text-[11px] text-emerald-400 font-mono font-bold uppercase">
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+              40 SERVICES &middot; 636 ENDPOINTS
+            </span>
           </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 z-10 w-full md:w-auto">
-            <div className="glass-panel p-4 flex flex-col gap-1 border-[#292D3D] bg-[#090A0F]/80 min-w-[140px]">
-              <span className="text-xs text-slate-400 font-medium">Catalog Volume</span>
-              <span className="text-lg font-bold text-white font-mono">40 Services</span>
-            </div>
-            <div className="glass-panel p-4 flex flex-col gap-1 border-[#292D3D] bg-[#090A0F]/80 min-w-[140px]">
-              <span className="text-xs text-slate-400 font-medium">Active Endpoints</span>
-              <span className="text-lg font-bold text-emerald-400 font-mono">636 Endpoints</span>
-            </div>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
+            Discover what your agent can do.
+          </h1>
+          <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+            Browse the curated catalog of x402-enabled APIs accepting micro-payments directly from your agent's USDC vault.
+            No API keys or checkout pages — your agent pays per call on-chain.
+          </p>
         </div>
 
-        {/* Controls: Search & Category Filter */}
-        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search across all 40 services, providers, or capabilities..."
-              className="w-full bg-[#11131F] border border-[#22252F] rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-neon-blue/50 transition-colors"
-            />
+        <div className="grid grid-cols-2 gap-2.5 z-10 w-full md:w-auto md:flex sm:flex-row">
+          <div className="glass-panel p-3.5 sm:p-4 flex flex-col gap-1 border-[#292D3D] bg-[#090A0F]/80 min-w-0 sm:min-w-[140px] rounded-xl">
+            <span className="text-[10px] sm:text-xs text-slate-400 font-medium">Catalog Volume</span>
+            <span className="text-base sm:text-lg font-bold text-white font-mono">40 Services</span>
           </div>
-
-          <div className="flex items-center gap-4 text-xs font-mono text-slate-400 px-2">
-            <div className="flex items-center gap-1.5">
-              <span className="px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">1P</span>
-              <span>Direct Provider</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="px-1.5 py-0.5 rounded border border-neon-blue/40 bg-neon-blue/10 text-neon-cyan text-[10px] font-bold">3P</span>
-              <span>Third-Party Protocol</span>
-            </div>
+          <div className="glass-panel p-3.5 sm:p-4 flex flex-col gap-1 border-[#292D3D] bg-[#090A0F]/80 min-w-0 sm:min-w-[140px] rounded-xl">
+            <span className="text-[10px] sm:text-xs text-slate-400 font-medium">Active Endpoints</span>
+            <span className="text-base sm:text-lg font-bold text-emerald-400 font-mono">636 Endpoints</span>
           </div>
         </div>
+      </div>
 
-        {/* Category Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {CATEGORIES.map((cat) => {
-            const isActive = selectedCategory === cat.id;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
-                  isActive
-                    ? "bg-neon-blue text-slate-950 shadow-lg shadow-neon-blue/20"
-                    : "bg-[#11131F] border border-[#22252F] text-slate-400 hover:text-white hover:border-[#333748]"
-                }`}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
+      {/* Controls: Search & Category Filter */}
+      <div className="flex flex-col md:flex-row gap-3.5 sm:gap-4 items-stretch md:items-center justify-between">
+        <div className="relative flex-1 w-full md:max-w-md">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search all 40 services, providers..."
+            className="w-full bg-[#11131F] border border-[#22252F] rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-neon-blue/50 transition-colors h-11 sm:h-10"
+          />
         </div>
 
-        {/* Services Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredServices.map((service) => {
-            const Icon = service.icon;
-            return (
-              <div
-                key={service.id}
-                className="glass-panel p-6 border-[#22252F] bg-[#11131F]/90 hover:border-neon-blue/40 transition-all duration-300 flex flex-col justify-between gap-5 group relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-neon-blue/5 rounded-full blur-2xl group-hover:bg-neon-blue/10 transition-colors pointer-events-none" />
+        <div className="flex items-center justify-between sm:justify-start gap-4 text-xs font-mono text-slate-400 px-1">
+          <div className="flex items-center gap-1.5">
+            <span className="px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">1P</span>
+            <span className="text-[11px] sm:text-xs">Direct Provider</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="px-1.5 py-0.5 rounded border border-neon-blue/40 bg-neon-blue/10 text-neon-cyan text-[10px] font-bold">3P</span>
+            <span className="text-[11px] sm:text-xs">Third-Party Protocol</span>
+          </div>
+        </div>
+      </div>
 
-                <div className="flex flex-col gap-4 z-10">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-cyan shrink-0 group-hover:scale-105 transition-transform">
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">
-                          {service.name}
-                        </span>
-                        <span className="text-xs text-slate-400">{service.provider}</span>
-                      </div>
+      {/* Category Filter Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none touch-pan-x">
+        {CATEGORIES.map((cat) => {
+          const isActive = selectedCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer min-h-[38px] flex items-center justify-center shrink-0 active:scale-[0.98] ${
+                isActive
+                  ? "bg-neon-blue text-slate-950 shadow-lg shadow-neon-blue/20"
+                  : "bg-[#11131F] border border-[#22252F] text-slate-400 hover:text-white hover:border-[#333748]"
+              }`}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Services Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        {filteredServices.map((service) => {
+          const Icon = service.icon;
+          return (
+            <div
+              key={service.id}
+              className="glass-panel p-5 sm:p-6 border-[#22252F] bg-[#11131F]/90 hover:border-neon-blue/40 transition-all duration-300 flex flex-col justify-between gap-4 sm:gap-5 group relative overflow-hidden rounded-2xl"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-neon-blue/5 rounded-full blur-2xl group-hover:bg-neon-blue/10 transition-colors pointer-events-none" />
+
+              <div className="flex flex-col gap-3.5 sm:gap-4 z-10">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-cyan shrink-0 group-hover:scale-105 transition-transform">
+                      <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
-
-                    <span
-                      className={`px-2 py-0.5 rounded border text-[10px] font-mono font-bold shrink-0 ${
-                        service.type === "1P"
-                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                          : "border-neon-blue/30 bg-neon-blue/10 text-neon-cyan"
-                      }`}
-                    >
-                      {service.type}
-                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-bold text-white text-sm sm:text-base group-hover:text-neon-cyan transition-colors truncate">
+                        {service.name}
+                      </span>
+                      <span className="text-[11px] sm:text-xs text-slate-400 truncate">{service.provider}</span>
+                    </div>
                   </div>
 
-                  <p className="text-slate-300 text-xs leading-relaxed font-sans">
-                    {service.description}
-                  </p>
+                  <span
+                    className={`px-2 py-0.5 rounded border text-[10px] font-mono font-bold shrink-0 ${
+                      service.type === "1P"
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                        : "border-neon-blue/30 bg-neon-blue/10 text-neon-cyan"
+                    }`}
+                  >
+                    {service.type}
+                  </span>
+                </div>
 
-                  <div className="p-3 rounded-lg bg-[#090A0F] border border-[#22252F] flex flex-col gap-1.5">
-                    <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider font-semibold">
-                      Example Prompt
+                <p className="text-slate-300 text-xs leading-relaxed font-sans line-clamp-3">
+                  {service.description}
+                </p>
+
+                <div className="p-3 rounded-xl bg-[#090A0F] border border-[#22252F] flex flex-col gap-1.5">
+                  <span className="text-[9px] sm:text-[10px] text-slate-400 font-mono uppercase tracking-wider font-semibold">
+                    Example Prompt
+                  </span>
+                  <p className="text-xs text-slate-200 font-mono line-clamp-2">
+                    "{service.examplePrompt}"
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-3.5 border-t border-[#22252F] z-10">
+                <div className="flex flex-col">
+                  <span className="text-[9px] sm:text-[10px] text-slate-400 uppercase tracking-wider font-mono">Cost Per Call</span>
+                  <div className="flex items-center gap-1">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-xs sm:text-sm font-bold text-emerald-400 font-mono">
+                      {service.priceUsdc.toFixed(2)} USDC
                     </span>
-                    <p className="text-xs text-slate-200 font-mono line-clamp-2">
-                      "{service.examplePrompt}"
-                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-4 border-t border-[#22252F] z-10">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono">Cost Per Call</span>
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-sm font-bold text-emerald-400 font-mono">
-                        {service.priceUsdc.toFixed(2)} USDC
+                <button
+                  onClick={() => handleRunWithAgent(service)}
+                  className="px-3.5 sm:px-4 py-2 min-h-[38px] rounded-xl bg-neon-blue text-slate-950 text-xs font-bold transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 cursor-pointer shadow-md shadow-neon-blue/10"
+                >
+                  <span>Run with Agent</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {filteredServices.length === 0 && (
+        <div className="glass-panel p-8 sm:p-12 text-center flex flex-col items-center gap-3 border-[#22252F] bg-[#11131F] rounded-2xl">
+          <Bot className="w-10 h-10 text-slate-500" />
+          <h3 className="text-base sm:text-lg font-bold text-white">No services found</h3>
+          <p className="text-slate-400 text-xs max-w-sm">
+            Try searching with broader terms like "search", "crypto", "data", or select "All Services".
+          </p>
+        </div>
+      )}
+
+      {/* Select Target Agent Modal (when multiple agents exist) */}
+      {selectedServiceForModal && !noAgentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="glass-panel max-w-md w-full p-5 sm:p-6 border-[#22252F] bg-[#11131F] rounded-2xl flex flex-col gap-4 sm:gap-5 shadow-2xl relative max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-[#22252F] pb-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-cyan shrink-0">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider truncate">Select Target Agent</h3>
+                  <span className="text-[10px] text-slate-400 font-mono truncate">
+                    {selectedServiceForModal.name} (${selectedServiceForModal.priceUsdc} USDC)
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedServiceForModal(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#22252F] transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Choose which agent's Circle vault will execute this service call and pay <strong>{selectedServiceForModal.priceUsdc} USDC</strong> on Arc Testnet.
+            </p>
+
+            <div className="flex flex-col gap-2.5 max-h-[50vh] sm:max-h-72 overflow-y-auto pr-1">
+              {agents.map((agent) => (
+                <div
+                  key={agent.id}
+                  onClick={() => handleSelectAgentAndRun(agent.id)}
+                  className="p-3 sm:p-3.5 rounded-xl bg-[#090A0F]/70 border border-[#22252F] hover:border-neon-cyan/50 flex items-center justify-between cursor-pointer transition-all group min-h-[52px]"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan group-hover:scale-105 transition-transform shrink-0">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-bold text-white group-hover:text-neon-cyan transition-colors truncate">
+                        {agent.name}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-500 truncate">
+                        {agent.wallet ? `${agent.wallet.substring(0, 6)}...${agent.wallet.substring(agent.wallet.length - 4)}` : agent.id}
                       </span>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleRunWithAgent(service)}
-                    className="px-4 py-2 rounded-lg bg-neon-blue text-slate-950 text-xs font-bold transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 cursor-pointer shadow-md shadow-neon-blue/10"
-                  >
-                    <span>Run with Agent</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {filteredServices.length === 0 && (
-          <div className="glass-panel p-12 text-center flex flex-col items-center gap-3 border-[#22252F] bg-[#11131F]">
-            <Bot className="w-10 h-10 text-slate-500" />
-            <h3 className="text-lg font-bold text-white">No services found</h3>
-            <p className="text-slate-400 text-xs max-w-sm">
-              Try searching with broader terms like "search", "crypto", "data", or select "All Services".
-            </p>
-          </div>
-        )}
-
-        {/* Select Target Agent Modal (when multiple agents exist) */}
-        {selectedServiceForModal && !noAgentModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="glass-panel max-w-md w-full p-6 border-[#22252F] bg-[#11131F] rounded-2xl flex flex-col gap-5 shadow-2xl relative">
-              <div className="flex items-center justify-between border-b border-[#22252F] pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-cyan">
-                    <Bot className="w-4 h-4" />
-                  </div>
-                  <div className="flex flex-col">
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Select Agent to Run Service</h3>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {selectedServiceForModal.name} (${selectedServiceForModal.priceUsdc} USDC)
-                    </span>
+                  <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                    <div className="flex flex-col text-right font-mono">
+                      <span className="text-xs font-bold text-neon-blue">{agent.balance} {agent.token}</span>
+                      <span className="text-[9px] text-slate-500">Vault</span>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-neon-cyan group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedServiceForModal(null)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#22252F] transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <p className="text-xs text-slate-400">
-                Choose which agent's Circle vault will execute this service call and pay <strong>{selectedServiceForModal.priceUsdc} USDC</strong> on Arc Testnet.
-              </p>
-
-              <div className="flex flex-col gap-2.5 max-h-72 overflow-y-auto pr-1">
-                {agents.map((agent) => (
-                  <div
-                    key={agent.id}
-                    onClick={() => handleSelectAgentAndRun(agent.id)}
-                    className="p-3.5 rounded-xl bg-[#090A0F]/70 border border-[#22252F] hover:border-neon-cyan/50 flex items-center justify-between cursor-pointer transition-all group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan group-hover:scale-105 transition-transform">
-                        <Bot className="w-4 h-4" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-white group-hover:text-neon-cyan transition-colors">
-                          {agent.name}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-500">
-                          {agent.wallet ? `${agent.wallet.substring(0, 6)}...${agent.wallet.substring(agent.wallet.length - 4)}` : agent.id}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex flex-col text-right font-mono">
-                        <span className="text-xs font-bold text-neon-blue">{agent.balance} {agent.token}</span>
-                        <span className="text-[9px] text-slate-500">Vault Balance</span>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-neon-cyan group-hover:translate-x-0.5 transition-all" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-3 border-t border-[#22252F] flex justify-between items-center">
-                <button
-                  onClick={() => {
-                    setSelectedServiceForModal(null);
-                    router.push("/agents");
-                  }}
-                  className="text-[10px] font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5 text-neon-blue" />
-                  Create New Agent
-                </button>
-
-                <button
-                  onClick={() => setSelectedServiceForModal(null)}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-xs font-bold text-slate-300 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
+              ))}
             </div>
-          </div>
-        )}
 
-        {/* No Agent Found Modal (when user has 0 agents) */}
-        {noAgentModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="glass-panel max-w-sm w-full p-6 border-[#22252F] bg-[#11131F] rounded-2xl flex flex-col gap-4 text-center items-center shadow-2xl relative">
+            <div className="pt-3 border-t border-[#22252F] flex justify-between items-center">
               <button
-                onClick={() => setNoAgentModalOpen(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#22252F] transition-colors cursor-pointer"
+                onClick={() => {
+                  setSelectedServiceForModal(null);
+                  router.push("/agents");
+                }}
+                className="text-[10px] font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <X className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5 text-neon-blue" />
+                Create New Agent
               </button>
 
-              <div className="w-14 h-14 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-blue mt-2">
-                <Bot className="w-7 h-7" />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">No Agent Vault Found</h3>
-                <p className="text-xs text-slate-400">
-                  You need an active Circle AI agent vault to execute x402 marketplace services on Arc Testnet.
-                </p>
-              </div>
-
-              <div className="flex flex-col w-full gap-2 mt-2">
-                <button
-                  onClick={() => {
-                    setNoAgentModalOpen(false);
-                    router.push("/agents");
-                  }}
-                  className="w-full h-10 rounded-xl bg-neon-cyan hover:bg-neon-blue text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-lg shadow-neon-cyan/10"
-                >
-                  <Plus className="w-4 h-4" />
-                  Create Your First Agent
-                </button>
-                <button
-                  onClick={() => setNoAgentModalOpen(false)}
-                  className="w-full h-9 rounded-xl bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
+              <button
+                onClick={() => setSelectedServiceForModal(null)}
+                className="px-3.5 py-1.5 rounded-xl bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-xs font-bold text-slate-300 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* No Agent Found Modal (when user has 0 agents) */}
+      {noAgentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="glass-panel max-w-sm w-full p-5 sm:p-6 border-[#22252F] bg-[#11131F] rounded-2xl flex flex-col gap-4 text-center items-center shadow-2xl relative">
+            <button
+              onClick={() => setNoAgentModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#22252F] transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-blue mt-2">
+              <Bot className="w-6 h-6 sm:w-7 sm:h-7" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">No Agent Vault Found</h3>
+              <p className="text-xs text-slate-400">
+                You need an active Circle AI agent vault to execute x402 marketplace services on Arc Testnet.
+              </p>
+            </div>
+
+            <div className="flex flex-col w-full gap-2 mt-2">
+              <button
+                onClick={() => {
+                  setNoAgentModalOpen(false);
+                  router.push("/agents");
+                }}
+                className="w-full h-10 rounded-xl bg-neon-cyan hover:bg-neon-blue text-slate-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-lg shadow-neon-cyan/10 min-h-[42px]"
+              >
+                <Plus className="w-4 h-4" />
+                Create Your First Agent
+              </button>
+              <button
+                onClick={() => setNoAgentModalOpen(false)}
+                className="w-full h-9 rounded-xl bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer min-h-[38px]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
