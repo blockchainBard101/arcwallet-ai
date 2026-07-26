@@ -565,7 +565,7 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto flex flex-col gap-5 sm:gap-8 pb-16 px-1 sm:px-0">
+    <div className="w-full max-w-7xl mx-auto flex flex-col gap-5 sm:gap-8 pb-16 px-1 sm:px-0 min-w-0">
       {/* Hero Banner */}
       <div className="glass-panel p-5 sm:p-8 relative overflow-hidden bg-gradient-to-r from-[#11131F] via-[#0D101C] to-[#15192C] border-[#22252F] flex flex-col md:flex-row justify-between items-start md:items-center gap-5 sm:gap-6 rounded-2xl">
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-neon-blue/10 rounded-full blur-3xl pointer-events-none" />
@@ -628,7 +628,7 @@ export default function MarketplacePage() {
       </div>
 
       {/* Category Filter Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none touch-pan-x">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none touch-pan-x w-full min-w-0">
         {CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat.id;
           return (

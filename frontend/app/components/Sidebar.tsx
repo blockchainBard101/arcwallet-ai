@@ -79,7 +79,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-white text-base tracking-tight">BlockGENT</span>
-              <span className="text-[10px] text-neon-cyan font-mono tracking-widest font-semibold uppercase">Circle Stack</span>
             </div>
           </Link>
 
