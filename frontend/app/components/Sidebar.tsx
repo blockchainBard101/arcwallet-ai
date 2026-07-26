@@ -67,12 +67,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Brand Logo + Mobile Close Button */}
         <div className="flex items-center justify-between px-2">
           <Link href="/" className="flex items-center gap-3 group" onClick={onClose}>
-            <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-[#090A0F] border border-neon-blue/20 transition-transform duration-300 group-hover:scale-105 shrink-0">
+            <div className="w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center bg-[#090A0F] border border-neon-blue/20 transition-transform duration-300 group-hover:scale-105 shrink-0">
               <Image
                 src="/blockgent.png"
                 alt="BlockGENT"
-                width={36}
-                height={36}
+                width={44}
+                height={44}
                 className="object-contain"
                 priority
               />

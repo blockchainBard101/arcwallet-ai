@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useApp, getBackendUrl } from "../context/AppContext";
 import {
@@ -25,7 +26,89 @@ import {
   X,
   Plus,
   Wallet,
+  Copy,
+  Terminal,
+  Check,
 } from "lucide-react";
+
+interface ServiceEndpoint {
+  path: string;
+  method: "GET" | "POST";
+  description: string;
+  priceUsdc: number;
+  examplePayload?: string;
+}
+
+const SERVICE_ENDPOINTS: Record<string, ServiceEndpoint[]> = {
+  "exa-search": [
+    { path: "/search", method: "POST", description: "Semantic search across the web for complex queries.", priceUsdc: 0.02, examplePayload: '{\n  "query": "Circle Agent Stack standards",\n  "numResults": 5\n}' },
+    { path: "/findSimilar", method: "POST", description: "Find web pages structurally similar to a target URL.", priceUsdc: 0.02, examplePayload: '{\n  "url": "https://circle.com",\n  "numResults": 3\n}' },
+    { path: "/contents", method: "POST", description: "Retrieve parsed clean text/markdown content from target URLs.", priceUsdc: 0.02, examplePayload: '{\n  "ids": ["https://example.com"]\n}' }
+  ],
+  "perplexity-sonar": [
+    { path: "/chat/completions", method: "POST", description: "Query Perplexity's Sonar reasoning model with citations.", priceUsdc: 0.03, examplePayload: '{\n  "model": "sonar",\n  "messages": [\n    { "role": "user", "content": "Recent updates on USDC on Arc L1" }\n  ]\n}' }
+  ],
+  "tavily-research": [
+    { path: "/search", method: "POST", description: "Deep search optimized for autonomous LLM research runs.", priceUsdc: 0.015, examplePayload: '{\n  "query": "Arc blockchain performance benchmarks",\n  "search_depth": "advanced"\n}' }
+  ],
+  "firecrawl-scraper": [
+    { path: "/scrape", method: "POST", description: "Scrape any web page and output clean markdown.", priceUsdc: 0.01, examplePayload: '{\n  "url": "https://developers.circle.com"\n}' },
+    { path: "/crawl", method: "POST", description: "Crawl sub-pages of a domain recursively.", priceUsdc: 0.01, examplePayload: '{\n  "url": "https://circle.com",\n  "limit": 10\n}' }
+  ],
+  "brave-search": [
+    { path: "/web/search", method: "GET", description: "Brave independent privacy search index query.", priceUsdc: 0.01 }
+  ],
+  "coingecko-pro": [
+    { path: "/simple/price", method: "GET", description: "Retrieve current prices of tokens in USD/EUR.", priceUsdc: 0.02 },
+    { path: "/coins/markets", method: "GET", description: "List coin market values, volume, and rank.", priceUsdc: 0.02 },
+    { path: "/coins/{id}/history", method: "GET", description: "Historical pricing checkpoints by date.", priceUsdc: 0.02 }
+  ],
+  "goldsky": [
+    { path: "/subgraphs", method: "POST", description: "Query indexed blockchain data nodes via GraphQL.", priceUsdc: 0.04, examplePayload: '{\n  "query": "{ transfers(first: 5) { id amount sender } }"\n}' }
+  ],
+  "resend-email": [
+    { path: "/emails", method: "POST", description: "Send modern transactional HTML emails.", priceUsdc: 0.02, examplePayload: '{\n  "from": "agent@blockgent.ai",\n  "to": "user@example.com",\n  "subject": "Agent Vault Balance Alert",\n  "html": "<p>Vault balance is below 10 USDC.</p>"\n}' }
+  ],
+  "sendgrid-email": [
+    { path: "/mail/send", method: "POST", description: "Relay delivery emails through SendGrid.", priceUsdc: 0.03, examplePayload: '{\n  "personalizations": [\n    { "to": [{ "email": "user@example.com" }] }\n  ],\n  "from": { "email": "agent@blockgent.ai" },\n  "subject": "Alert",\n  "content": [\n    { "type": "text/plain", "value": "Vault warning." }\n  ]\n}' }
+  ],
+  "twilio-sms": [
+    { path: "/2010-04-01/Accounts/{Sid}/Messages.json", method: "POST", description: "Dispatch SMS text messages globally.", priceUsdc: 0.08, examplePayload: '{\n  "To": "+1234567890",\n  "Body": "Your vault swap rule executed."\n}' }
+  ],
+  "openai-gpt4o": [
+    { path: "/v1/chat/completions", method: "POST", description: "High-speed multimodal LLM inference.", priceUsdc: 0.05, examplePayload: '{\n  "model": "gpt-4o",\n  "messages": [\n    { "role": "user", "content": "Perform yield analysis" }\n  ]\n}' }
+  ],
+  "anthropic-claude": [
+    { path: "/v1/messages", method: "POST", description: "Claude 3.5 Sonnet long-context analysis engine.", priceUsdc: 0.06, examplePayload: '{\n  "model": "claude-3-5-sonnet",\n  "max_tokens": 1024,\n  "messages": [\n    { "role": "user", "content": "Review smart contract bytecode" }\n  ]\n}' }
+  ],
+  "deepseek-v3": [
+    { path: "/v1/chat/completions", method: "POST", description: "Cost-effective mathematical and coding reasoning.", priceUsdc: 0.01, examplePayload: '{\n  "model": "deepseek-chat",\n  "messages": [\n    { "role": "user", "content": "Optimize LP coefficients" }\n  ]\n}' }
+  ]
+};
+
+const getServiceEndpoints = (service: ServiceItem): ServiceEndpoint[] => {
+  const specific = SERVICE_ENDPOINTS[service.id];
+  if (specific) return specific;
+  
+  const price = typeof service.priceUsdc === 'number' ? service.priceUsdc : parseFloat(service.priceUsdc as any) || 0.02;
+  
+  // Dynamic fallback endpoints
+  return [
+    {
+      path: "/execute",
+      method: "POST",
+      description: `Default pay-per-call API endpoint for ${service.name}.`,
+      priceUsdc: price,
+      examplePayload: JSON.stringify({ query: service.examplePrompt }, null, 2)
+    },
+    {
+      path: "/status",
+      method: "GET",
+      description: `Get real-time health and usage status for ${service.name}.`,
+      priceUsdc: 0.005
+    }
+  ];
+};
 
 interface ServiceItem {
   id: string;
@@ -482,6 +565,12 @@ export default function MarketplacePage() {
   const [services, setServices] = useState<ServiceItem[]>(MARKETPLACE_SERVICES);
   const [selectedServiceForModal, setSelectedServiceForModal] = useState<ServiceItem | null>(null);
   const [noAgentModalOpen, setNoAgentModalOpen] = useState(false);
+  const [selectedServiceForEndpoints, setSelectedServiceForEndpoints] = useState<ServiceItem | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Fetch dynamic live services from backend / Circle marketplace registry
   React.useEffect(() => {
@@ -697,24 +786,32 @@ export default function MarketplacePage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-3.5 border-t border-[#22252F] z-10">
-                <div className="flex flex-col">
+              <div className="flex items-center justify-between pt-3.5 border-t border-[#22252F] z-10 gap-2">
+                <div className="flex flex-col min-w-0">
                   <span className="text-[9px] sm:text-[10px] text-slate-400 uppercase tracking-wider font-mono">Cost Per Call</span>
                   <div className="flex items-center gap-1">
-                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-xs sm:text-sm font-bold text-emerald-400 font-mono">
-                      {service.priceUsdc.toFixed(2)} USDC
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-xs sm:text-sm font-bold text-emerald-400 font-mono truncate">
+                      {(Number(service.priceUsdc) || 0).toFixed(2)} USDC
                     </span>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => handleRunWithAgent(service)}
-                  className="px-3.5 sm:px-4 py-2 min-h-[38px] rounded-xl bg-neon-blue text-slate-950 text-xs font-bold transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 cursor-pointer shadow-md shadow-neon-blue/10"
-                >
-                  <span>Run with Agent</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => setSelectedServiceForEndpoints(service)}
+                    className="px-2.5 py-1.5 min-h-[34px] rounded-xl border border-[#22252F] bg-[#15161C] hover:bg-[#22252F] hover:border-neon-cyan/50 text-slate-300 text-[11px] font-bold transition-all duration-200 cursor-pointer active:scale-[0.98]"
+                  >
+                    Endpoints
+                  </button>
+                  <button
+                    onClick={() => handleRunWithAgent(service)}
+                    className="px-3 py-1.5 min-h-[34px] rounded-xl bg-neon-blue text-slate-950 text-[11px] font-bold transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1 cursor-pointer shadow-md shadow-neon-blue/10"
+                  >
+                    <span>Run</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -732,7 +829,7 @@ export default function MarketplacePage() {
       )}
 
       {/* Select Target Agent Modal (when multiple agents exist) */}
-      {selectedServiceForModal && !noAgentModalOpen && (
+      {selectedServiceForModal && !noAgentModalOpen && mounted && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="glass-panel max-w-md w-full p-5 sm:p-6 border-[#22252F] bg-[#11131F] rounded-2xl flex flex-col gap-4 sm:gap-5 shadow-2xl relative max-h-[90vh]">
             <div className="flex items-center justify-between border-b border-[#22252F] pb-3">
@@ -743,7 +840,7 @@ export default function MarketplacePage() {
                 <div className="flex flex-col min-w-0">
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider truncate">Select Target Agent</h3>
                   <span className="text-[10px] text-slate-400 font-mono truncate">
-                    {selectedServiceForModal.name} (${selectedServiceForModal.priceUsdc} USDC)
+                    {selectedServiceForModal.name} (${(Number(selectedServiceForModal.priceUsdc) || 0).toFixed(2)} USDC)
                   </span>
                 </div>
               </div>
@@ -756,7 +853,7 @@ export default function MarketplacePage() {
             </div>
 
             <p className="text-xs text-slate-400 leading-relaxed">
-              Choose which agent's Circle vault will execute this service call and pay <strong>{selectedServiceForModal.priceUsdc} USDC</strong> on Arc Testnet.
+              Choose which agent's Circle vault will execute this service call and pay <strong>{(Number(selectedServiceForModal.priceUsdc) || 0).toFixed(2)} USDC</strong> on Arc Testnet.
             </p>
 
             <div className="flex flex-col gap-2.5 max-h-[50vh] sm:max-h-72 overflow-y-auto pr-1">
@@ -811,11 +908,12 @@ export default function MarketplacePage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* No Agent Found Modal (when user has 0 agents) */}
-      {noAgentModalOpen && (
+      {noAgentModalOpen && mounted && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="glass-panel max-w-sm w-full p-5 sm:p-6 border-[#22252F] bg-[#11131F] rounded-2xl flex flex-col gap-4 text-center items-center shadow-2xl relative">
             <button
@@ -855,7 +953,132 @@ export default function MarketplacePage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Endpoints & API Documentation Modal */}
+      {selectedServiceForEndpoints && mounted && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="glass-panel max-w-2xl w-full p-5 sm:p-6 border-[#22252F] bg-[#11131F] rounded-2xl flex flex-col gap-4 sm:gap-5 shadow-2xl relative max-h-[90vh] overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-[#22252F] pb-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-neon-cyan/10 border border-neon-cyan/20 flex items-center justify-center text-neon-cyan shrink-0">
+                  <Terminal className="w-4 h-4" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <h3 className="text-sm font-bold text-white truncate">
+                    {selectedServiceForEndpoints.name}
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono truncate">
+                    API Endpoints & Price Registry
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedServiceForEndpoints(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#22252F] transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4">
+              <div className="p-3 rounded-xl bg-[#090A0F]/60 border border-[#22252F]">
+                <span className="text-[9px] uppercase tracking-wider font-mono text-slate-400 font-bold block mb-1">
+                  Base URL (X402 API Gateway)
+                </span>
+                <div className="flex items-center justify-between gap-3 bg-[#050608] px-3 py-2 rounded-lg border border-[#22252F] font-mono text-xs">
+                  <span className="text-neon-cyan truncate">{selectedServiceForEndpoints.serviceUrl}</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedServiceForEndpoints.serviceUrl);
+                    }}
+                    className="text-slate-400 hover:text-white cursor-pointer active:scale-95 transition-all p-1"
+                    title="Copy Base URL"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wide">
+                  Available Sub-Endpoints
+                </h4>
+                
+                <div className="flex flex-col gap-3">
+                  {getServiceEndpoints(selectedServiceForEndpoints).map((ep, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-xl bg-[#090A0F] border border-[#22252F] flex flex-col gap-3"
+                    >
+                      {/* Endpoint Signature & Price */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#22252F] pb-2">
+                        <div className="flex items-center gap-2 font-mono text-xs">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              ep.method === "POST"
+                                ? "bg-neon-cyan/10 border border-neon-cyan/20 text-neon-cyan"
+                                : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                            }`}
+                          >
+                            {ep.method}
+                          </span>
+                          <span className="text-white font-semibold">{ep.path}</span>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-400 font-mono">
+                          {(Number(ep.priceUsdc) || 0).toFixed(3)} USDC
+                        </span>
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-slate-400 text-xs leading-relaxed">
+                        {ep.description}
+                      </p>
+
+                      {/* Payload Example */}
+                      {ep.examplePayload && (
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 font-bold uppercase tracking-wider">
+                            <span>Request Payload JSON</span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(ep.examplePayload!);
+                              }}
+                              className="text-slate-400 hover:text-white cursor-pointer active:scale-95 transition-all p-1 flex items-center gap-1"
+                              title="Copy Payload JSON"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Copy</span>
+                            </button>
+                          </div>
+                          <pre className="bg-[#050608] p-3 rounded-lg border border-[#22252F] font-mono text-[10px] text-slate-300 overflow-x-auto max-h-36 scrollbar-none">
+                            {ep.examplePayload}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-[#22252F] flex justify-end shrink-0">
+              <button
+                onClick={() => setSelectedServiceForEndpoints(null)}
+                className="px-4 py-2 rounded-xl bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-xs font-bold text-slate-300 transition-colors cursor-pointer"
+              >
+                Close Documentation
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
