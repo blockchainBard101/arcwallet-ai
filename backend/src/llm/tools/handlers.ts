@@ -1,5 +1,6 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { CircleService } from '../../circle/circle.service';
+import { X402ClientService } from '../../circle/x402-client.service';
 import { AppService } from '../../app.service';
 import { TransactionService } from '../../transaction/transaction.service';
 import { SubscriptionService } from '../../subscription/subscription.service';
@@ -9,6 +10,7 @@ export interface ToolContext {
   userId: string;
   prisma: PrismaService;
   circle: CircleService;
+  x402: X402ClientService;
   transactionService: TransactionService;
   subscriptionService: SubscriptionService;
 }
@@ -525,13 +527,56 @@ async function handleCreateRule(
 
     await ctx.subscriptionService.checkRuleLimit(ctx.userId);
 
+    // ── Validate & auto-correct action ─────────────────────────────────────
+    const action = { ...input.action };
+    const KNOWN_TOKENS = ['USDC', 'EURC', 'USDT', 'WETH', 'ETH', 'BTC', 'WBTC', 'SOL', 'DAI'];
+
+    if (action.type === 'transfer') {
+      // If 'to' is a token symbol (not a 0x address), the LLM confused swap with transfer — auto-correct
+      const toField = (action.to || '').toString().trim();
+      const isTokenSymbol = KNOWN_TOKENS.some(t => t.toLowerCase() === toField.toLowerCase());
+      const isAddress = /^0x[0-9a-fA-F]{40}$/.test(toField);
+
+      if (isTokenSymbol || (!isAddress && toField.length < 10)) {
+        // Auto-correct to swap
+        action.type = 'swap';
+        action.fromToken = input.trigger?.token || 'USDC';
+        action.toToken = toField || 'EURC';
+        delete action.to;
+        console.warn(
+          `[RuleValidation] Auto-corrected rule action from transfer→swap. ` +
+          `'to' was "${toField}" (a token, not an address). ` +
+          `New action: swap ${action.fromToken} → ${action.toToken}`
+        );
+      } else if (!isAddress && toField.length > 0) {
+        return JSON.stringify({
+          success: false,
+          error: `Invalid transfer address: "${toField}" is not a valid 0x wallet address. For token conversions, use action type "swap" with fromToken and toToken instead.`,
+        });
+      }
+    }
+
+    if (action.type === 'swap') {
+      // Ensure fromToken and toToken are set for swap actions
+      if (!action.fromToken) action.fromToken = input.trigger?.token || 'USDC';
+      if (!action.toToken) {
+        return JSON.stringify({
+          success: false,
+          error: 'Swap action requires a "toToken" field specifying the target token (e.g. "EURC").',
+        });
+      }
+      // Remove irrelevant 'to' field if present on swap
+      delete action.to;
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     const rule = await ctx.prisma.rule.create({
       data: {
         agentId: input.agentId,
         naturalRuleText: input.naturalRuleText,
         parsedConditions: {
           trigger: input.trigger,
-          action: input.action,
+          action,
         },
         status: 'active',
       },
@@ -542,7 +587,8 @@ async function handleCreateRule(
       ruleId: rule.id,
       naturalRuleText: rule.naturalRuleText,
       status: rule.status,
-      message: `Successfully created rule: "${rule.naturalRuleText}". It is now active.`,
+      parsedAction: action,
+      message: `Successfully created rule: "${rule.naturalRuleText}". It is now active and will evaluate every 30 seconds.`,
     });
   } catch (err: any) {
     return JSON.stringify({
@@ -551,6 +597,7 @@ async function handleCreateRule(
     });
   }
 }
+
 
 async function handleListRules(
   input: { agentId: string },
@@ -1027,26 +1074,23 @@ async function handleSetSpendingPolicy(
 
 async function handleDiscoverPaidServices(
   input: { keyword: string },
-  _ctx: ToolContext,
+  ctx: ToolContext,
 ): Promise<string> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { execSync } = require('child_process') as typeof import('child_process');
-    const raw = execSync(
-      `circle services search "${input.keyword}" --output json`,
-      { encoding: 'utf8', timeout: 15000 },
-    );
-    const results = JSON.parse(raw);
+    const services = await ctx.x402.searchServices(input.keyword);
     return JSON.stringify({
       success: true,
       keyword: input.keyword,
-      services: results,
-      tip: 'Call nanopay_call with the serviceUrl of your chosen service to pay and retrieve data.',
+      count: services.length,
+      services,
+      tip: services.length > 0
+        ? `Found ${services.length} service(s). Call nanopay_call with the serviceUrl of your chosen service to pay and use it.`
+        : `No services found for "${input.keyword}". Try broader keywords like "search", "email", "sms", "data", or "crypto".`,
     });
   } catch (err: any) {
     return JSON.stringify({
       success: false,
-      error: `Marketplace search failed: ${err.message}. Ensure the Circle CLI is installed and you are logged in (circle wallet status).`,
+      error: `Marketplace search failed: ${err.message}`,
     });
   }
 }
@@ -1058,88 +1102,66 @@ async function handleNanopayCall(
     chain?: string;
     data?: Record<string, unknown>;
   },
-  _ctx: ToolContext,
+  ctx: ToolContext,
 ): Promise<string> {
   // 1. Resolve agent and wallet
-  const agent = await _ctx.prisma.agent.findFirst({
-    where: { id: input.agentId, userId: _ctx.userId },
+  const agent = await ctx.prisma.agent.findFirst({
+    where: { id: input.agentId, userId: ctx.userId },
     include: { wallet: true },
   });
   if (!agent) return JSON.stringify({ error: 'Agent not found or not owned by you.' });
+  if (!agent.wallet?.address) return JSON.stringify({ error: 'Agent has no wallet configured.' });
 
   const chain = input.chain ?? 'BASE';
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { execSync } = require('child_process') as typeof import('child_process');
 
-  // 2. Inspect — surface cost before paying
-  let inspectResult: any = {};
+  // 2. Inspect cost upfront (non-paying request)
+  const inspection = await ctx.x402.inspectService(input.serviceUrl);
+  const estimatedCost = inspection.cost || 0.001;
+
+  // 3. Enforce nanopay subscription budget
   try {
-    const inspectRaw = execSync(
-      `circle services inspect "${input.serviceUrl}" --chain ${chain} --output json`,
-      { encoding: 'utf8', timeout: 10000 },
-    );
-    inspectResult = JSON.parse(inspectRaw);
+    await ctx.subscriptionService.checkNanopayBudget(ctx.userId, estimatedCost);
   } catch (err: any) {
-    // If inspect fails, we can still attempt the payment in case it's a transient CLI issue
-    inspectResult.cost = 0.001; // fallback cost guess
+    return JSON.stringify({ success: false, error: err.message, chain });
   }
 
-  // Enforce nanopay budget
-  try {
-    await _ctx.subscriptionService.checkNanopayBudget(_ctx.userId, inspectResult.cost || 0.001);
-  } catch (err: any) {
-    return JSON.stringify({
-      error: err.message,
-      success: false,
-    });
-  }
+  // 4. Pay and call via x402 HTTP (no CLI required — works in production)
+  const result = await ctx.x402.callAndPay(
+    input.serviceUrl,
+    agent.walletId,
+    agent.wallet.address,
+    input.data,
+  );
 
-  // 3. Pay and call the service
-  const dataFlag = input.data ? `--data '${JSON.stringify(input.data)}'` : '';
-  let payResult: any = {};
-  let status: 'success' | 'failed' = 'success';
-
+  // 5. Log in DB
   try {
-    const payRaw = execSync(
-      `circle services pay "${input.serviceUrl}" --address ${agent.wallet.address} --chain ${chain} ${dataFlag} --output json`,
-      { encoding: 'utf8', timeout: 30000 },
-    );
-    payResult = JSON.parse(payRaw);
-  } catch (err: any) {
-    status = 'failed';
-    payResult = { error: err.message };
-  }
-
-  // 4. Log the transaction in the DB and update usage
-  try {
-    const cost = parseFloat(payResult.amountPaid || inspectResult.cost || 0);
-    await _ctx.prisma.nanopaymentLog.create({
+    await ctx.prisma.nanopaymentLog.create({
       data: {
         agentId: agent.id,
         serviceUrl: input.serviceUrl,
-        serviceName: payResult.serviceName || inspectResult.serviceName || 'unknown',
+        serviceName: input.serviceUrl.replace(/https?:\/\//, '').split('/')[0],
         chain,
-        amountUsdc: cost,
-        status: 'success',
-        responseSnippet: JSON.stringify(payResult.data || payResult).substring(0, 500),
+        amountUsdc: result.costUsdc,
+        status: result.success ? 'success' : 'failed',
+        responseSnippet: JSON.stringify(result.data || result.error || '').substring(0, 500),
       },
     });
-    
-    if (cost > 0) {
-      await _ctx.subscriptionService.incrementNanopayUsage(_ctx.userId, cost);
+    if (result.costUsdc > 0) {
+      await ctx.subscriptionService.incrementNanopayUsage(ctx.userId, result.costUsdc);
     }
-  } catch (err) {
-    // Fire and forget logging failure
+  } catch {
+    // Non-critical — log failure silently
   }
 
-  if (status === 'failed') {
+  if (!result.success) {
     return JSON.stringify({
       success: false,
       agentName: agent.name,
       serviceUrl: input.serviceUrl,
       chain,
-      error: payResult.error,
-      tip: 'If the CLI is unavailable or wallet has no balance, run `circle wallet balance` and `circle wallet status` to diagnose.',
+      costUsdc: result.costUsdc,
+      txId: result.txId,
+      error: result.error,
     });
   }
 
@@ -1148,8 +1170,9 @@ async function handleNanopayCall(
     agentName: agent.name,
     serviceUrl: input.serviceUrl,
     chain,
-    costUsdc: parseFloat(payResult.amountPaid || inspectResult?.cost || 0),
-    response: payResult,
+    costUsdc: result.costUsdc,
+    txId: result.txId,
+    response: result.data,
   });
 }
 async function handleDepositToYieldPool(
@@ -1302,21 +1325,60 @@ async function handleSwapTokens(
         amountIn: input.amountIn.toFixed(6),
         config: { kitKey },
       });
-      estimatedOutput = typeof estimation.estimatedOutput === 'object' ? (estimation.estimatedOutput as any)?.amount || JSON.stringify(estimation.estimatedOutput) : String(estimation.estimatedOutput);
+      estimatedOutput = typeof estimation.estimatedOutput === 'object'
+        ? (estimation.estimatedOutput as any)?.amount || JSON.stringify(estimation.estimatedOutput)
+        : String(estimation.estimatedOutput);
     } catch (estError) {
       console.warn('[Swap Estimate Warning]', estError);
     }
 
-    const result = await kit.swap({
-      from: { adapter, chain: chain as any, address: agent.wallet.address },
-      tokenIn: input.tokenIn.toUpperCase(),
-      tokenOut: input.tokenOut.toUpperCase(),
-      amountIn: input.amountIn.toFixed(6),
-      config: {
-        kitKey,
-        slippageBps: input.slippageBps ?? 100,
-      },
-    });
+    /**
+     * Circle SCA wallets are counterfactual — the contract is only deployed on first tx.
+     * App Kit's permit flow (EIP-2612) requires the contract to be deployed.
+     * Always use allowanceStrategy: "approve" to force on-chain ERC-20 approve instead.
+     *
+     * If the wallet is still undeployed, send a tiny self-transfer first to deploy it,
+     * wait for confirmation, then retry the swap.
+     */
+    const attemptSwap = () =>
+      kit.swap({
+        from: { adapter, chain: chain as any, address: agent.wallet.address },
+        tokenIn: input.tokenIn.toUpperCase(),
+        tokenOut: input.tokenOut.toUpperCase(),
+        amountIn: input.amountIn.toFixed(6),
+        config: {
+          kitKey,
+          slippageBps: input.slippageBps ?? 100,
+          allowanceStrategy: 'approve', // always use on-chain approve, never permit
+        },
+      });
+
+    let result: any;
+    try {
+      result = await attemptSwap();
+    } catch (swapErr: any) {
+      const isUndeployed =
+        swapErr?.message?.includes('undeployed wallet') ||
+        swapErr?.message?.includes('Cannot generate a signature from an undeployed');
+
+      if (isUndeployed) {
+        console.log(`[SwapTokens] Wallet ${agent.wallet.address} is undeployed. Deploying via self-transfer...`);
+        try {
+          await ctx.circle.sendUsdcFromAgentWallet(
+            agent.walletId,
+            agent.wallet.address, // send to self — deploys the SCA contract
+            0.000001,
+          );
+          console.log(`[SwapTokens] Deployment tx submitted. Waiting 8s for Arc confirmation...`);
+          await new Promise((r) => setTimeout(r, 8000));
+        } catch (deployErr: any) {
+          console.warn(`[SwapTokens] Wallet deployment attempt failed: ${deployErr.message}. Retrying swap anyway...`);
+        }
+        result = await attemptSwap();
+      } else {
+        throw swapErr;
+      }
+    }
 
     const replacer = (key: string, value: any) =>
       typeof value === 'bigint' ? value.toString() : value;
@@ -1368,4 +1430,5 @@ async function handleSwapTokens(
     });
   }
 }
+
 

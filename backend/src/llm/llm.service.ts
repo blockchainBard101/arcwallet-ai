@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
 import { CircleService } from '../circle/circle.service';
+import { X402ClientService } from '../circle/x402-client.service';
 import { CORE_TOOLS } from './tools/registry';
 import { executeTool } from './tools/handlers';
 import { TransactionService } from '../transaction/transaction.service';
@@ -43,7 +44,29 @@ Rules you MUST follow:
    - If the user asks to send/transfer USDC to another address on Arc, call 'execute_transaction' server-side.
    - If the user wants to fund your vault or send from their own primary (Privy) wallet, call 'prepare_transaction'.
 4. Keep responses concise, clear, and human-friendly. Format numbers properly (e.g. "1,250.00 USDC").
-5. If a tool returns an error, explain it plainly and suggest next steps.`;
+5. If a tool returns an error, explain it plainly and suggest next steps.
+
+## CRITICAL RULE-CREATION GUIDELINES (never deviate from these)
+
+When calling 'create_rule', you MUST choose the correct action type:
+
+### action.type = 'swap'  ← Use when user says: convert, exchange, swap, turn X into Y
+  - Required fields: fromToken (e.g. "USDC"), toToken (e.g. "EURC"), amount (number)
+  - NEVER set 'to' field for swap actions — it is irrelevant and must be omitted
+  - Example: "convert 1 USDC to EURC" → { type: "swap", fromToken: "USDC", toToken: "EURC", amount: 1 }
+
+### action.type = 'transfer'  ← Use ONLY when user specifies a wallet address recipient
+  - Required fields: to (a 0x wallet address), amount (number)
+  - NEVER set 'to' to a token symbol like "EURC" — that is NOT a wallet address
+  - Example: "send 2 USDC to 0xABC..." → { type: "transfer", to: "0xABC...", amount: 2 }
+
+### trigger.type choices:
+  - 'balance': Evaluates current balance every 30s. Use when user says "if balance is above/below X"
+  - 'received': Fires once when a deposit arrives. Use when user says "when I receive X", "if it receives X", "when X USDC arrives"
+  - For "receives more than 2 USDC" → trigger: { type: "received", token: "USDC", value: 2, operator: "above" }
+  - For "balance goes above 2 USDC" → trigger: { type: "balance", token: "USDC", value: 2, operator: "above" }
+
+### IMPORTANT: Never confuse 'swap' and 'transfer'. Converting USDC to EURC is ALWAYS a swap, never a transfer.`;
 
 function buildSystemPrompt(agentId: string | undefined, agentName: string): string {
   const agentContext = agentId ? `
@@ -79,6 +102,7 @@ export class LlmService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly circle: CircleService,
+    private readonly x402: X402ClientService,
     private readonly transactionService: TransactionService,
     private readonly subscriptionService: SubscriptionService,
   ) {}
@@ -246,7 +270,14 @@ export class LlmService {
           const result = await executeTool(
             tool.name,
             tool.input as Record<string, any>,
-            { userId, prisma: this.prisma, circle: this.circle, transactionService: this.transactionService, subscriptionService: this.subscriptionService },
+            {
+              userId,
+              prisma: this.prisma,
+              circle: this.circle,
+              x402: this.x402,
+              transactionService: this.transactionService,
+              subscriptionService: this.subscriptionService,
+            },
           );
           this.enrichStructuredData(tool.name, result, structuredData);
           toolResults.push({ type: 'tool_result', tool_use_id: tool.id, content: result });
@@ -331,6 +362,7 @@ export class LlmService {
             userId,
             prisma: this.prisma,
             circle: this.circle,
+            x402: this.x402,
             transactionService: this.transactionService,
             subscriptionService: this.subscriptionService,
           });

@@ -8,6 +8,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useApp } from "../context/AppContext";
 import {
   Compass,
+  Store,
   LayoutDashboard,
   Bot,
   Briefcase,
@@ -33,6 +34,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const menuItems = [
     { name: "Explorer Chat", icon: Compass, path: "/chat" },
+    { name: "Agent Marketplace", icon: Store, path: "/marketplace" },
     { name: "Dashboard Explorer", icon: LayoutDashboard, path: "/dashboard" },
     { name: "My Agents", icon: Bot, path: "/agents" },
     { name: "Portfolio Overview", icon: Briefcase, path: "/portfolio" },

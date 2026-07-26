@@ -120,6 +120,62 @@ export class SchedulerService {
         this.logger.log(`Rule ${rule.id} triggered! Executing action...`);
         await this.executeRuleAction(rule, action);
       }
+    } else if (trigger.type === 'deposit' || trigger.type === 'incoming_transfer' || trigger.type === 'received') {
+      // Incoming Transfer / Deposit trigger
+      // Fires when the agent wallet receives a deposit >= the specified amount
+      const tokenSymbol = (trigger.token || 'USDC').toUpperCase();
+      const expectedAmount = parseFloat(trigger.value) || 0;
+      const operator = trigger.operator || 'above'; // default: above threshold
+
+      try {
+        // First check the current balance as a quick proxy for recent deposits
+        const balances = await this.circleService.getWalletTokenBalance(agent.walletId);
+        const balObj = balances.find(
+          (b) => b.token?.symbol?.toUpperCase() === tokenSymbol ||
+                 b.token?.name?.toUpperCase().includes(tokenSymbol)
+        );
+        const currentBalance = balObj ? parseFloat(balObj.amount) : 0;
+
+        let triggered = false;
+        if (operator === 'above' && currentBalance > expectedAmount) {
+          triggered = true;
+        } else if (operator === 'below' && currentBalance < expectedAmount) {
+          triggered = true;
+        } else if (expectedAmount === 0) {
+          triggered = true; // "whenever any USDC arrives"
+        }
+
+        // Also check recent Circle transactions for a confirmed inbound deposit
+        if (!triggered) {
+          try {
+            const circleTxs = await this.circleService.listTransactions([agent.walletId]);
+            const recentDeposit = circleTxs.find((tx: any) => {
+              const isIncoming =
+                tx.transactionType === 'INBOUND' ||
+                tx.destinationAddress?.toLowerCase() === agent.wallet.address.toLowerCase();
+              const amt = parseFloat(tx.amounts?.[0] || '0');
+              return (
+                isIncoming &&
+                tx.state === 'COMPLETE' &&
+                (expectedAmount === 0 || (operator === 'above' ? amt >= expectedAmount : amt <= expectedAmount))
+              );
+            });
+            if (recentDeposit) triggered = true;
+          } catch {
+            // Circle tx listing may not be available; rely on balance check above
+          }
+        }
+
+        if (triggered) {
+          this.logger.log(
+            `Deposit/received rule ${rule.id} triggered for agent ${agent.name}. ` +
+            `Balance: ${currentBalance} ${tokenSymbol}, threshold: ${expectedAmount}. Executing action...`
+          );
+          await this.executeRuleAction(rule, action);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Could not evaluate received/deposit trigger for rule ${rule.id}: ${err.message}`);
+      }
     } else if (trigger.type === 'price') {
       const tokenSymbol = trigger.token || 'ETH';
       const currentPrice = await this.fetchCoinPrice(tokenSymbol);
@@ -288,13 +344,58 @@ export class SchedulerService {
           const kit = new AppKit();
           const adapter = createCircleWalletsAdapter({ apiKey, entitySecret });
 
-          const result = await kit.swap({
-            from: { adapter, chain: 'Arc_Testnet', address: agent.wallet.address },
-            tokenIn: fromToken,
-            tokenOut: toToken,
-            amountIn: amount.toString(),
-            config: { kitKey },
-          });
+          /**
+           * Circle SCA wallets are counterfactual — the contract is only deployed on first tx.
+           * App Kit's permit flow (EIP-2612) requires the contract to be deployed.
+           * Always use allowanceStrategy: "approve" (on-chain ERC-20 approve) to avoid this.
+           *
+           * If the wallet is still undeployed, we first deploy it via a zero-amount
+           * Circle SDK token transfer (sends to itself), then retry the swap.
+           */
+          const attemptSwap = async () => {
+            return kit.swap({
+              from: { adapter, chain: 'Arc_Testnet', address: agent.wallet.address },
+              tokenIn: fromToken,
+              tokenOut: toToken,
+              amountIn: amount.toString(),
+              config: {
+                kitKey,
+                allowanceStrategy: 'approve', // force on-chain approve, never permit
+              },
+            });
+          };
+
+          let result: any;
+          try {
+            result = await attemptSwap();
+          } catch (swapErr: any) {
+            const isUndeployed =
+              swapErr?.message?.includes('undeployed wallet') ||
+              swapErr?.message?.includes('Cannot generate a signature from an undeployed');
+
+            if (isUndeployed) {
+              this.logger.warn(
+                `Agent ${agent.name} wallet is undeployed. Deploying via self-transfer then retrying swap...`
+              );
+              // Deploy the wallet: send a 0.000001 USDC self-transfer to trigger contract deployment
+              try {
+                await this.circleService.sendUsdcFromAgentWallet(
+                  agent.walletId,
+                  agent.wallet.address, // send to self
+                  0.000001,
+                );
+                this.logger.log(`Wallet deployment tx submitted for ${agent.wallet.address}. Waiting 8s for confirmation...`);
+                // Wait for the deployment tx to confirm on Arc (sub-second finality, 8s is plenty)
+                await new Promise((r) => setTimeout(r, 8000));
+              } catch (deployErr: any) {
+                this.logger.warn(`Wallet deployment attempt failed: ${deployErr.message}. Retrying swap anyway...`);
+              }
+              // Retry swap after deployment
+              result = await attemptSwap();
+            } else {
+              throw swapErr;
+            }
+          }
 
           await this.prisma.activityLog.create({
             data: {

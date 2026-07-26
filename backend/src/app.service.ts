@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { CircleService } from './circle/circle.service';
+import { X402ClientService } from './circle/x402-client.service';
 
 @Injectable()
 export class AppService {
@@ -10,7 +11,106 @@ export class AppService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly circleService?: CircleService,
+    @Optional() private readonly x402Service?: X402ClientService,
   ) {}
+
+  async getMarketplaceServices(query: string = '') {
+    if (this.x402Service) {
+      return this.x402Service.searchServices(query);
+    }
+    return [];
+  }
+
+  async getAgentTransactions(agentId: string) {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: agentId },
+      include: { wallet: true },
+    });
+
+    if (!agent) {
+      return { success: false, transactions: [] };
+    }
+
+    // 1. Fetch DB Nanopayment Logs
+    const nanopayments = await this.prisma.nanopaymentLog.findMany({
+      where: { agentId },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+
+    // 2. Fetch DB Activity Logs
+    const activities = await this.prisma.activityLog.findMany({
+      where: { agentId },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+
+    // 3. Attempt Circle API transaction fetch if CircleService is available
+    let circleTxs: any[] = [];
+    if (this.circleService && agent.walletId) {
+      try {
+        circleTxs = await this.circleService.listTransactions([agent.walletId]);
+      } catch (err: any) {
+        this.logger.warn(`Could not fetch Circle transactions for ${agent.walletId}: ${err.message}`);
+      }
+    }
+
+    // Format & Combine into unified items
+    const formattedNanopay = nanopayments.map((n) => ({
+      id: n.id,
+      type: 'x402 Nanopayment',
+      title: n.serviceName,
+      costUsdc: n.amountUsdc,
+      chain: n.chain || 'ARC-TESTNET',
+      status: n.status,
+      txHash: '0x' + n.id.replace(/-/g, '').substring(0, 40),
+      timestamp: n.createdAt.toISOString(),
+      details: `Service call: ${n.serviceUrl}`,
+    }));
+
+    const formattedActivities = activities.map((a: any) => ({
+      id: a.id,
+      type: a.actionType || 'Agent Execution',
+      title: `${a.actionType}`,
+      costUsdc: (a.payload as any)?.amount || 0,
+      chain: 'ARC-TESTNET',
+      status: a.status || 'success',
+      txHash: a.txHash || '0x' + a.id.replace(/-/g, '').substring(0, 40),
+      timestamp: a.createdAt.toISOString(),
+      details: a.payload ? JSON.stringify(a.payload) : 'Automated Agent Rule Trigger',
+    }));
+
+    const formattedCircle = circleTxs.map((c) => {
+      const isInbound = c.transactionType === 'INBOUND' || c.operation === 'INBOUND';
+      return {
+        id: c.id,
+        type: isInbound ? 'Deposit Received' : 'On-Chain Transfer',
+        title: `USDC ${c.transactionType || (isInbound ? 'INBOUND' : 'OUTBOUND')}`,
+        costUsdc: Math.abs(parseFloat(c.amounts?.[0] || '0')),
+        isInbound,
+        chain: c.blockchain || 'ARC-TESTNET',
+        status: c.state === 'COMPLETE' ? 'success' : c.state?.toLowerCase() || 'pending',
+        txHash: c.txHash || c.id,
+        timestamp: c.createDate || new Date().toISOString(),
+        details: isInbound ? `From: ${c.sourceAddress || 'External Wallet'}` : `To: ${c.destinationAddress || 'Recipient'}`,
+      };
+    });
+
+    const combined = [...formattedNanopay, ...formattedActivities, ...formattedCircle];
+    const uniqueMap = new Map();
+    combined.forEach((item) => uniqueMap.set(item.id, item));
+    const transactions = Array.from(uniqueMap.values());
+    transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return {
+      success: true,
+      agentId,
+      agentName: agent.name,
+      walletAddress: agent.wallet?.address || agent.walletId,
+      totalCount: transactions.length,
+      transactions,
+    };
+  }
 
   getHello(): string {
     return 'Hello World!';

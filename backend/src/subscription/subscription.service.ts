@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CircleService } from '../circle/circle.service';
 
 export const TIER_LIMITS = {
   free:       { maxAgents: 1,   maxRules: 3,         maxLlmCalls: 50,  nanopayBudget: 0     },
@@ -10,7 +11,10 @@ export const TIER_LIMITS = {
 
 @Injectable()
 export class SubscriptionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly circleService: CircleService,
+  ) {}
 
   async getSubscription(userId: string) {
     let sub = await this.prisma.subscription.findUnique({ where: { userId } });
@@ -107,6 +111,34 @@ export class SubscriptionService {
         currentPeriodEnd: nextMonth,
       },
     });
+  }
+
+  async getUserUsdcBalance(userId: string): Promise<number> {
+    const agents = await this.prisma.agent.findMany({
+      where: { userId },
+      include: { wallet: true },
+    });
+    let totalUsdc = 0;
+    for (const agent of agents) {
+      if (agent.walletId) {
+        try {
+          const balances = await this.circleService.getWalletTokenBalance(agent.walletId);
+          const usdcObj = balances.find((b: any) => b.token?.symbol === 'USDC' || b.token?.name?.includes('USDC'));
+          if (usdcObj) {
+            totalUsdc += parseFloat(usdcObj.amount || '0');
+          } else if (agent.wallet) {
+            totalUsdc += parseFloat((agent.wallet as any).balanceUSDC?.toString() || '0');
+          }
+        } catch {
+          if (agent.wallet) {
+            totalUsdc += parseFloat((agent.wallet as any).balanceUSDC?.toString() || '0');
+          }
+        }
+      } else if (agent.wallet) {
+        totalUsdc += parseFloat((agent.wallet as any).balanceUSDC?.toString() || '0');
+      }
+    }
+    return totalUsdc;
   }
 
   async updateTier(userId: string, tier: string) {

@@ -20,6 +20,16 @@ export class AppController {
     return this.appService.getWalletStats(address, timeframe, timezone);
   }
 
+  @Get('marketplace/services')
+  async getMarketplaceServices(@Query('q') query?: string) {
+    return this.appService.getMarketplaceServices(query || '');
+  }
+
+  @Get('agent/:id/transactions')
+  async getAgentTransactions(@Param('id') id: string) {
+    return this.appService.getAgentTransactions(id);
+  }
+
 
   @Get('auth-test')
   @UseGuards(AuthGuard)

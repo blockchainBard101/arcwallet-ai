@@ -18,6 +18,12 @@ import {
   Zap,
   Code,
   Shield,
+  ShieldAlert,
+  Check,
+  TrendingDown,
+  RefreshCw,
+  Bell,
+  Info,
 } from "lucide-react";
 
 interface PageProps {
@@ -168,8 +174,9 @@ export default function AgentRulesConsole({ params }: PageProps) {
           to: nlpStr.match(/0x[a-fA-F0-9]{40}/)?.[0] || "",
         };
       } else {
+        const isDeposit = conditionField.toLowerCase().includes("deposit") || conditionField.toLowerCase().includes("incoming");
         parsedTrigger = {
-          type: "balance",
+          type: isDeposit ? "deposit" : "balance",
           token: conditionField.includes("EURC") ? "EURC" : "USDC",
           operator: conditionOperator === ">" ? "above" : conditionOperator === "<" ? "below" : "above",
           value: parseFloat(conditionValue) || 1,
@@ -312,6 +319,18 @@ export default function AgentRulesConsole({ params }: PageProps) {
         
         {/* LEFT COLUMN: Builder Form */}
         <div className="lg:col-span-7 flex flex-col gap-6">
+          
+          {/* Rules Guidance Info Panel */}
+          <div className="p-4 rounded-2xl bg-neon-blue/5 border border-neon-blue/20 flex items-start gap-3 text-xs text-slate-300">
+            <Info className="w-4 h-4 text-neon-blue shrink-0 mt-0.5" />
+            <div className="flex flex-col gap-1">
+              <span className="font-bold text-white text-xs">How Guardrail Automation Rules Work</span>
+              <p className="text-[11px] leading-relaxed text-slate-400">
+                Rules monitor your agent vault node in real time. Whenever a trigger condition is met (e.g. <strong className="text-white">Incoming USDC Deposit &gt; 3</strong> or <strong className="text-white">USDC Balance &lt; 100</strong>), the background worker automatically executes your configured action (<strong className="text-neon-cyan">Swap Assets</strong> or <strong className="text-neon-cyan">Transfer USDC</strong>) on-chain.
+              </p>
+            </div>
+          </div>
+
           <form onSubmit={handleDeployRule} className="glass-panel bg-[#15161C] p-6 flex flex-col gap-5">
             
             <div className="flex items-center gap-2.5 border-b border-[#22252F] pb-3">
@@ -367,7 +386,9 @@ export default function AgentRulesConsole({ params }: PageProps) {
                       className="h-10 px-3 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
                     >
                       <option className="bg-[#090A0F] text-white">USDC Balance</option>
+                      <option className="bg-[#090A0F] text-white">Incoming USDC Deposit</option>
                       <option className="bg-[#090A0F] text-white">EURC Balance</option>
+                      <option className="bg-[#090A0F] text-white">Incoming EURC Deposit</option>
                       <option className="bg-[#090A0F] text-white">EURC Oracle Price</option>
                       <option className="bg-[#090A0F] text-white">RPC Gas Limit</option>
                     </select>

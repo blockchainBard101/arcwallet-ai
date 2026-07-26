@@ -13,6 +13,7 @@ import {
   Download,
   Filter,
   ExternalLink,
+  Zap,
 } from "lucide-react";
 
 export default function ActivityPage() {
@@ -54,6 +55,12 @@ export default function ActivityPage() {
         return (
           <div className="w-9 h-9 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center text-neon-blue shrink-0 z-10">
             <ArrowLeftRight className="w-4.5 h-4.5" />
+          </div>
+        );
+      case "nanopay":
+        return (
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 z-10">
+            <Zap className="w-4.5 h-4.5" />
           </div>
         );
       case "transfer":
@@ -154,6 +161,7 @@ export default function ActivityPage() {
             className="h-9 px-3 rounded-lg bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50"
           >
             <option value="all">All Types</option>
+            <option value="nanopay">x402 Marketplace Nanopayments</option>
             <option value="swaps">Token Swaps & Triggers</option>
             <option value="transfers">Bridges & Transfers</option>
             <option value="agents">Agent Deployments</option>

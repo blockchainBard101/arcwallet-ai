@@ -45,7 +45,9 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "utf-8-validate": "5.0.10",
-    "viem": "^2.55.4"
+    "viem": "^2.55.4",
+    "x402": "^1.2.0",
+    "x402-fetch": "^1.2.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -89,6 +91,9 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "transformIgnorePatterns": [
+      "node_modules/(?!(jose|@privy-io)/)"
+    ]
   }
 }

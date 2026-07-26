@@ -30,6 +30,20 @@ describe('LLM Tool Handlers - Alerts', () => {
       prisma: mockPrisma as any,
       circle: mockCircle as any,
       transactionService: {} as any,
+      subscriptionService: {
+        checkRuleLimit: jest.fn().mockResolvedValue(undefined),
+        checkLlmLimit: jest.fn().mockResolvedValue(undefined),
+        checkNanopayBudget: jest.fn().mockResolvedValue(undefined),
+        incrementLlmUsage: jest.fn().mockResolvedValue(undefined),
+        incrementNanopayUsage: jest.fn().mockResolvedValue(undefined),
+        getSubscription: jest.fn().mockResolvedValue({ tier: 'pro' }),
+        getTierLimits: jest.fn().mockReturnValue({ maxAgents: 3, maxRules: Infinity, maxLlmCalls: 500, nanopayBudget: 5.0 }),
+      } as any,
+      x402: {
+        searchServices: jest.fn().mockResolvedValue([]),
+        inspectService: jest.fn().mockResolvedValue({ cost: 0.001, currency: 'USDC' }),
+        callAndPay: jest.fn().mockResolvedValue({ success: true, costUsdc: 0.001, serviceUrl: 'https://example.com' }),
+      } as any,
     };
   });
 

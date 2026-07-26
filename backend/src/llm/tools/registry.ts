@@ -198,7 +198,7 @@ export const CORE_TOOLS: Anthropic.Tool[] = [
   {
     name: 'create_rule',
     description:
-      'Create a new automation rule for an agent. Use when the user says "add a rule", "create a rule", "set up a rule", or similar condition (e.g., "if balance drops below X, transfer Y to Z"). The rule triggers automatically when conditions are met.',
+      'Create a new automation rule for an agent. Use when the user says "add a rule", "create a rule", "set up a rule", or similar condition (e.g., "if balance drops below X, transfer Y to Z", "when I receive 3 USDC, convert 2 to EURC"). The rule triggers automatically when conditions are met.',
     input_schema: {
       type: 'object',
       properties: {
@@ -208,28 +208,39 @@ export const CORE_TOOLS: Anthropic.Tool[] = [
         },
         naturalRuleText: {
           type: 'string',
-          description: 'The raw natural language text of the rule.',
+          description: 'The raw natural language text of the rule as the user stated it.',
         },
         trigger: {
           type: 'object',
           description: 'The trigger condition config.',
           properties: {
-            type: { type: 'string', enum: ['balance'], description: 'The type of trigger.' },
-            token: { type: 'string', description: 'Token symbol to monitor (e.g. USDC).' },
+            type: {
+              type: 'string',
+              enum: ['balance', 'received'],
+              description: 'The type of trigger. Use "balance" when the rule fires when balance goes above/below a threshold (re-checks every 30s). Use "received" when the rule fires once when a deposit arrives (e.g. "when I receive X USDC").',
+            },
+            token: { type: 'string', description: 'Token symbol to monitor (e.g. "USDC", "EURC").' },
             operator: { type: 'string', enum: ['below', 'above'], description: 'Comparison operator.' },
-            value: { type: 'number', description: 'Threshold value.' },
+            value: { type: 'number', description: 'Threshold value in token units (e.g. 2 for "2 USDC").' },
           },
           required: ['type', 'token', 'operator', 'value'],
         },
         action: {
           type: 'object',
-          description: 'The action config to execute when triggered.',
+          description: 'The action config to execute when triggered. CRITICAL: Use type="swap" for any convert/exchange/swap between tokens. Use type="transfer" ONLY when sending to a wallet address.',
           properties: {
-            type: { type: 'string', enum: ['transfer', 'swap'], description: 'Type of action.' },
+            type: {
+              type: 'string',
+              enum: ['transfer', 'swap'],
+              description: 'SWAP: for converting one token to another (e.g. USDC → EURC). TRANSFER: for sending tokens to a wallet address (0x...). NEVER use transfer to mean swap.',
+            },
             amount: { type: 'number', description: 'Amount of tokens to move or swap.' },
-            to: { type: 'string', description: 'Recipient wallet address (0x...) for transfer actions.' },
-            fromToken: { type: 'string', description: 'Source token symbol (e.g. USDC) for swap actions.' },
-            toToken: { type: 'string', description: 'Target token symbol (e.g. EURC) for swap actions.' },
+            to: {
+              type: 'string',
+              description: 'For TRANSFER only: the 0x recipient wallet address. MUST be a valid EVM address, NOT a token symbol. Do NOT set this for swap actions.',
+            },
+            fromToken: { type: 'string', description: 'For SWAP only: source token symbol (e.g. "USDC"). Do NOT set for transfer.' },
+            toToken: { type: 'string', description: 'For SWAP only: target token symbol (e.g. "EURC"). Do NOT set for transfer.' },
           },
           required: ['type', 'amount'],
         },

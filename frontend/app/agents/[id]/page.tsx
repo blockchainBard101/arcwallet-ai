@@ -26,6 +26,9 @@ import {
   ShieldAlert,
   Shield,
   X,
+  Globe,
+  History,
+  Receipt,
 } from "lucide-react";
 
 interface PageProps {
@@ -103,6 +106,44 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
   const [dailyLimit, setDailyLimit] = useState("200");
   const [monthlyLimit, setMonthlyLimit] = useState("1000");
   const [policySaved, setPolicySaved] = useState(false);
+
+  // Supported Chains modal state
+  const [supportedChainsModalOpen, setSupportedChainsModalOpen] = useState(false);
+
+  // Agent Transaction & Nanopayment History state
+  const [agentTransactions, setAgentTransactions] = useState<any[]>([]);
+  const [txFilter, setTxFilter] = useState<'all' | 'x402' | 'rules'>('all');
+  const [txLoading, setTxLoading] = useState(false);
+
+  useEffect(() => {
+    if (!agent?.id) return;
+    const fetchTransactions = async () => {
+      setTxLoading(true);
+      try {
+        const res = await fetch(`${getBackendUrl()}/agent/${agent.id}/transactions`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.transactions)) {
+            setAgentTransactions(data.transactions);
+          }
+        }
+      } catch {
+        // Fallback
+      } finally {
+        setTxLoading(false);
+      }
+    };
+
+    fetchTransactions();
+    const interval = setInterval(fetchTransactions, 10000);
+    return () => clearInterval(interval);
+  }, [agent?.id]);
+
+  const filteredTxs = agentTransactions.filter((tx) => {
+    if (txFilter === 'x402') return tx.type.toLowerCase().includes('x402') || tx.type.toLowerCase().includes('nano');
+    if (txFilter === 'rules') return !tx.type.toLowerCase().includes('x402');
+    return true;
+  });
 
   const handleCopyFundAddress = () => {
     navigator.clipboard.writeText(agent?.wallet ?? "");
@@ -199,6 +240,15 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
 
     loadChatHistory();
   }, [id, authenticated, agent]);
+
+  // Load pending prompt from marketplace run button if available
+  useEffect(() => {
+    const pending = localStorage.getItem("blockgent_pending_prompt");
+    if (pending) {
+      setInputValue(pending);
+      localStorage.removeItem("blockgent_pending_prompt");
+    }
+  }, []);
 
   // Initialize logs & fetch real activity history from backend / Circle API
   useEffect(() => {
@@ -569,10 +619,11 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
   };
 
   const suggestionChips = [
-    "Simulate portfolio rebalance",
-    "Swap 50 USDC for EURC",
-    "Show active rules logs",
-    "Check Circle vault balance",
+    "🔍 Research AI news (~$0.02)",
+    "💱 Swap 1 USDC for EURC",
+    "⚡ Auto-convert deposits > 2 USDC",
+    "🌐 Check domain availability",
+    "📊 Analyze USDC liquidity pools",
   ];
 
   return (
@@ -597,7 +648,7 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
             : "text-slate-400 border-[#22252F] bg-[#15161C] hover:text-slate-200"
         }`}
       >
-        📡 Telemetry
+        📡 Telemetry & History
       </button>
     </div>
 
@@ -623,6 +674,13 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActivePanel("telemetry")}
+              className="min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#22252F] bg-[#15161C] hover:bg-[#22252F] text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <History className="w-3.5 h-3.5 text-neon-blue shrink-0" />
+              <span>Tx History</span>
+            </button>
             <button
               onClick={() => router.push(`/agents/${agent.id}/dashboard`)}
               className="min-h-[36px] px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#22252F] bg-[#15161C] hover:bg-[#22252F] text-[10px] font-bold text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
@@ -943,6 +1001,59 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
           </div>
         </div>
 
+        {/* Agent Capabilities & Services Hub */}
+        <div className="glass-panel border-[#22252F] bg-[#15161C] p-5 flex flex-col gap-4">
+          <div className="flex items-center justify-between border-b border-[#22252F] pb-3">
+            <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-neon-cyan" />
+              Active Agent Capabilities
+            </span>
+            <button
+              onClick={() => router.push("/marketplace")}
+              className="text-[9px] font-bold text-neon-blue hover:text-neon-cyan tracking-wider uppercase transition-colors cursor-pointer"
+            >
+              Marketplace Hub &rarr;
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl bg-[#090A0F]/60 border border-emerald-500/20 flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-white">x402 Nanopayments</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <span className="text-[9px] text-slate-400">Pay-per-call APIs (Exa, Goldsky)</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#090A0F]/60 border border-neon-blue/20 flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-white">Circle Token Swaps</span>
+                <span className="w-2 h-2 rounded-full bg-neon-blue animate-pulse" />
+              </div>
+              <span className="text-[9px] text-slate-400">Instant USDC &harr; EURC swaps</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#090A0F]/60 border border-neon-cyan/20 flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-white">Automated Rules</span>
+                <span className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse" />
+              </div>
+              <span className="text-[9px] text-slate-400">Balance & deposit triggers</span>
+            </div>
+
+            <div
+              onClick={() => setSupportedChainsModalOpen(true)}
+              className="p-3 rounded-xl bg-[#090A0F]/60 border border-purple-500/20 hover:border-purple-500/50 flex flex-col gap-1 cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-white group-hover:text-purple-300 transition-colors">CCTP Crosschain</span>
+                <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+              </div>
+              <span className="text-[9px] text-slate-400 font-medium">9 Supported Chains (Arc, Base...) &rarr;</span>
+            </div>
+          </div>
+        </div>
+
         {/* Configured Rules Overview */}
         <div className="glass-panel border-[#22252F] bg-[#15161C] p-5 flex flex-col gap-4">
           <div className="flex items-center justify-between border-b border-[#22252F] pb-3">
@@ -1004,6 +1115,107 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        </div>
+
+        {/* Agent On-Chain Transaction & Nanopayment History */}
+        <div className="glass-panel border-[#22252F] bg-[#15161C] p-5 flex flex-col gap-4">
+          <div className="flex items-center justify-between border-b border-[#22252F] pb-3">
+            <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <History className="w-4 h-4 text-neon-blue" />
+              Vault Transactions ({filteredTxs.length})
+            </span>
+            <button
+              onClick={() => router.push("/activity")}
+              className="text-[9px] font-bold text-neon-blue hover:text-neon-cyan tracking-wider uppercase transition-colors cursor-pointer"
+            >
+              Full Feed &rarr;
+            </button>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 bg-[#090A0F]/60 p-1 rounded-xl border border-[#22252F]">
+            <button
+              onClick={() => setTxFilter('all')}
+              className={`flex-1 py-1 text-[9px] font-bold rounded-lg transition-colors cursor-pointer ${
+                txFilter === 'all' ? 'bg-neon-blue/20 text-neon-cyan border border-neon-blue/30' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              ALL
+            </button>
+            <button
+              onClick={() => setTxFilter('x402')}
+              className={`flex-1 py-1 text-[9px] font-bold rounded-lg transition-colors cursor-pointer ${
+                txFilter === 'x402' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              x402 NANOPAY
+            </button>
+            <button
+              onClick={() => setTxFilter('rules')}
+              className={`flex-1 py-1 text-[9px] font-bold rounded-lg transition-colors cursor-pointer ${
+                txFilter === 'rules' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              ON-CHAIN
+            </button>
+          </div>
+
+          {/* Transaction List */}
+          <div className="flex flex-col gap-2.5 max-h-64 overflow-y-auto pr-1">
+            {filteredTxs.length === 0 ? (
+              <div className="text-center py-8 flex flex-col items-center gap-2">
+                <Receipt className="w-6 h-6 text-slate-500" />
+                <span className="text-[10px] text-slate-500">No on-chain transactions logged for this agent yet.</span>
+              </div>
+            ) : (
+              filteredTxs.map((tx) => {
+                const isInbound = tx.isInbound || tx.title?.toLowerCase().includes('inbound') || tx.type?.toLowerCase().includes('deposit');
+                const isOutbound = tx.title?.toLowerCase().includes('outbound') || tx.type?.toLowerCase().includes('outbound');
+                const amountVal = typeof tx.costUsdc === 'number' ? Math.abs(tx.costUsdc).toFixed(2) : tx.costUsdc;
+
+                return (
+                  <div key={tx.id} className="p-3 rounded-xl bg-[#090A0F]/60 border border-[#22252F] flex flex-col gap-1.5 hover:border-[#22252F]/90 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase ${
+                          isInbound
+                            ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                            : isOutbound
+                            ? 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+                            : tx.type?.toLowerCase().includes('x402')
+                            ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                            : 'bg-purple-500/10 border border-purple-500/30 text-purple-300'
+                        }`}>
+                          {tx.type}
+                        </span>
+                        <span className="text-xs font-bold text-white truncate max-w-[130px]">{tx.title}</span>
+                      </div>
+                      <span className={`text-xs font-bold font-mono ${isInbound ? 'text-emerald-400 font-extrabold' : 'text-rose-400 font-extrabold'}`}>
+                        {isInbound ? `+$${amountVal}` : `-$${amountVal}`} USDC
+                      </span>
+                    </div>
+
+                  <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 pt-1 border-t border-[#22252F]/40">
+                    <div className="flex items-center gap-1">
+                      <span>{new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>•</span>
+                      <span className="text-slate-500">{tx.chain}</span>
+                    </div>
+
+                    <a
+                      href={`https://arcscan.network/tx/${tx.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-neon-blue hover:text-neon-cyan flex items-center gap-0.5 transition-colors"
+                    >
+                      <span>{tx.txHash ? `${tx.txHash.substring(0, 6)}...${tx.txHash.substring(tx.txHash.length - 4)}` : 'View Tx'}</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
+                </div>
+              ); })
             )}
           </div>
         </div>
@@ -1275,6 +1487,70 @@ export default function AgentDetailWorkspace({ params }: PageProps) {
                 className="h-9 px-5 rounded-xl bg-neon-cyan text-slate-950 font-bold text-xs cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all"
               >
                 {policySaved ? "Limits Saved!" : "Save Policy Limits"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supported Chains Modal */}
+      {supportedChainsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="glass-panel max-w-md w-full p-6 border-[#22252F] bg-[#11131F] rounded-2xl flex flex-col gap-5 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-[#22252F] pb-3">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-neon-blue" />
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Agent Supported Blockchains</h3>
+              </div>
+              <button
+                onClick={() => setSupportedChainsModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#22252F] transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Circle Agent Wallets support the following 9 blockchains on mainnet and testnet. Pass the testnet identifier to <code className="text-neon-cyan bg-[#090A0F] px-1 py-0.5 rounded">--chain</code> in CLI commands.
+            </p>
+
+            <div className="grid grid-cols-1 gap-2 max-h-80 overflow-y-auto pr-1">
+              {[
+                { name: "Arc Testnet", mainnet: "—", testnet: "ARC-TESTNET", badge: "Native USDC Gas", active: true },
+                { name: "Arbitrum", mainnet: "ARB", testnet: "ARB-SEPOLIA", active: true },
+                { name: "Avalanche", mainnet: "AVAX", testnet: "AVAX-FUJI", active: true },
+                { name: "Base", mainnet: "BASE", testnet: "BASE-SEPOLIA", active: true },
+                { name: "Ethereum", mainnet: "ETH", testnet: "ETH-SEPOLIA", active: true },
+                { name: "Monad", mainnet: "MONAD", testnet: "MONAD-TESTNET", active: true },
+                { name: "Optimism", mainnet: "OP", testnet: "OP-SEPOLIA", active: true },
+                { name: "Polygon PoS", mainnet: "MATIC", testnet: "MATIC-AMOY", active: true },
+                { name: "Unichain", mainnet: "UNI", testnet: "UNI-SEPOLIA", active: true },
+              ].map((chain) => (
+                <div key={chain.name} className="p-3 rounded-xl bg-[#090A0F]/60 border border-[#22252F] flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">{chain.name}</span>
+                      {chain.badge && (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-bold text-emerald-400">
+                          {chain.badge}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400">CLI: --chain {chain.testnet}</span>
+                  </div>
+                  <span className="px-2 py-1 rounded bg-[#15161C] border border-[#22252F] text-[10px] font-mono text-neon-blue">
+                    {chain.testnet}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-[#22252F] flex justify-end">
+              <button
+                onClick={() => setSupportedChainsModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-[#15161C] hover:bg-[#22252F] border border-[#22252F] text-xs font-bold text-white transition-colors cursor-pointer"
+              >
+                Close View
               </button>
             </div>
           </div>

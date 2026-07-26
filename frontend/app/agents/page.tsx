@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "../context/AppContext";
-import { Bot, Plus, Play, Pause, ExternalLink, Zap, TrendingDown, RefreshCw, Bell, MessageSquare, ArrowRight, Copy } from "lucide-react";
+import { Bot, Plus, Play, Pause, ExternalLink, Zap, TrendingDown, RefreshCw, Bell, MessageSquare, ArrowRight, Copy, Info, Check, HelpCircle } from "lucide-react";
 import MetricCard from "../components/MetricCard";
 
 const LLM_PROVIDERS = [
@@ -31,12 +31,31 @@ export default function AgentsPage() {
   const [showKey, setShowKey] = useState(false);
   const [ruleText, setRuleText] = useState("");
 
+  // Rule Builder Form states within creation modal
+  const [enableInitialRule, setEnableInitialRule] = useState(true);
+  const [ruleCreationMode, setRuleCreationMode] = useState<"visual" | "nlp">("visual");
+  const [conditionField, setConditionField] = useState("USDC Balance");
+  const [conditionOperator, setConditionOperator] = useState(">");
+  const [conditionValue, setConditionValue] = useState("1000");
+  const [actionType, setActionType] = useState("Swap Assets");
+  const [actionDetail, setActionDetail] = useState("Swap 100 USDC to EURC");
+
   const handleCreateAgentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
     const modelLabel = LLM_PROVIDERS.find((p) => p.id === provider)?.label ?? provider;
-    addAgent(name.trim(), modelLabel, ruleText.trim(), { provider, apiKey });
+    
+    let finalInitialRule = "";
+    if (enableInitialRule) {
+      if (ruleCreationMode === "visual") {
+        finalInitialRule = `If ${conditionField} is ${conditionOperator} ${conditionValue}, then execute action: ${actionDetail}.`;
+      } else {
+        finalInitialRule = ruleText.trim();
+      }
+    }
+
+    addAgent(name.trim(), modelLabel, finalInitialRule, { provider, apiKey });
     
     // Clear states
     setName("");
@@ -304,33 +323,135 @@ export default function AgentsPage() {
                 />
               </div>
 
-              {/* Natural Language Rule */}
-              <div className="flex flex-col gap-2">
-                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Initial Automation Rule <span className="text-slate-600 font-normal normal-case">(optional)</span></label>
-                {/* Quick-rule template chips */}
-                <div className="flex flex-wrap gap-1.5">
-                  {RULE_TEMPLATES.map((t) => (
-                    <button
-                      key={t.label}
-                      type="button"
-                      onClick={() => setRuleText(t.text)}
-                      className={`flex items-center gap-1 px-2.5 h-7 rounded-lg border text-[10px] font-semibold transition-all cursor-pointer ${
-                        ruleText === t.text
-                          ? "border-neon-cyan/50 bg-neon-cyan/10 text-neon-cyan"
-                          : "border-[#22252F] bg-[#090A0F] text-slate-400 hover:text-slate-200 hover:border-[#2e3140]"
-                      }`}
-                    >
-                      <t.icon className="w-3 h-3" />
-                      {t.label}
-                    </button>
-                  ))}
+              {/* Rule Builder Mode Toggle */}
+              <div className="flex flex-col gap-2.5 border-t border-[#22252F] pt-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableInitialRule}
+                      onChange={(e) => setEnableInitialRule(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded accent-neon-blue cursor-pointer"
+                    />
+                    Enable Initial Rule
+                  </label>
+                  {enableInitialRule && (
+                    <div className="flex items-center gap-1 bg-[#090A0F] p-0.5 rounded-lg border border-[#22252F]">
+                      <button
+                        type="button"
+                        onClick={() => setRuleCreationMode("visual")}
+                        className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${
+                          ruleCreationMode === "visual" ? "bg-neon-blue text-slate-950" : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        Visual Blocks
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRuleCreationMode("nlp")}
+                        className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${
+                          ruleCreationMode === "nlp" ? "bg-neon-blue text-slate-950" : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        NL Prompt
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <textarea
-                  placeholder="Describe what your agent should do, or pick a template above..."
-                  value={ruleText}
-                  onChange={(e) => setRuleText(e.target.value)}
-                  className="p-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50 min-h-[72px] leading-relaxed resize-none transition-colors placeholder:text-slate-600"
-                />
+
+                {enableInitialRule && (
+                  ruleCreationMode === "visual" ? (
+                    <div className="flex flex-col gap-2.5 bg-[#090A0F]/60 p-3 rounded-xl border border-[#22252F]">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8px] font-bold text-slate-500 uppercase">Condition Field</label>
+                          <select
+                            value={conditionField}
+                            onChange={(e) => setConditionField(e.target.value)}
+                            className="h-8 px-2 rounded-lg bg-[#090A0F] border border-[#22252F] text-[10px] text-white focus:outline-none focus:border-neon-blue/50"
+                          >
+                            <option className="bg-[#090A0F] text-white">USDC Balance</option>
+                            <option className="bg-[#090A0F] text-white">Incoming USDC Deposit</option>
+                            <option className="bg-[#090A0F] text-white">EURC Balance</option>
+                            <option className="bg-[#090A0F] text-white">Incoming EURC Deposit</option>
+                            <option className="bg-[#090A0F] text-white">EURC Oracle Price</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8px] font-bold text-slate-500 uppercase">Operator & Value</label>
+                          <div className="flex gap-1">
+                            <select
+                              value={conditionOperator}
+                              onChange={(e) => setConditionOperator(e.target.value)}
+                              className="h-8 px-1.5 rounded-lg bg-[#090A0F] border border-[#22252F] text-[10px] text-white focus:outline-none focus:border-neon-blue/50"
+                            >
+                              <option value=">">&gt;</option>
+                              <option value="<">&lt;</option>
+                              <option value="=">=</option>
+                            </select>
+                            <input
+                              type="number"
+                              value={conditionValue}
+                              onChange={(e) => setConditionValue(e.target.value)}
+                              className="h-8 px-2 rounded-lg bg-[#090A0F] border border-[#22252F] text-[10px] text-white focus:outline-none focus:border-neon-blue/50 w-full font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8px] font-bold text-slate-500 uppercase">Action Type</label>
+                          <select
+                            value={actionType}
+                            onChange={(e) => setActionType(e.target.value)}
+                            className="h-8 px-2 rounded-lg bg-[#090A0F] border border-[#22252F] text-[10px] text-white focus:outline-none focus:border-neon-blue/50"
+                          >
+                            <option className="bg-[#090A0F] text-white">Swap Assets</option>
+                            <option className="bg-[#090A0F] text-white">Transfer USDC</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[8px] font-bold text-slate-500 uppercase">Parameters</label>
+                          <input
+                            type="text"
+                            value={actionDetail}
+                            onChange={(e) => setActionDetail(e.target.value)}
+                            placeholder="e.g. Swap 100 USDC to EURC"
+                            className="h-8 px-2 rounded-lg bg-[#090A0F] border border-[#22252F] text-[10px] text-white focus:outline-none focus:border-neon-blue/50 font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {/* Quick-rule template chips */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {RULE_TEMPLATES.map((t) => (
+                          <button
+                            key={t.label}
+                            type="button"
+                            onClick={() => setRuleText(t.text)}
+                            className={`flex items-center gap-1 px-2.5 h-7 rounded-lg border text-[10px] font-semibold transition-all cursor-pointer ${
+                              ruleText === t.text
+                                ? "border-neon-cyan/50 bg-neon-cyan/10 text-neon-cyan"
+                                : "border-[#22252F] bg-[#090A0F] text-slate-400 hover:text-slate-200 hover:border-[#2e3140]"
+                            }`}
+                          >
+                            <t.icon className="w-3 h-3" />
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        placeholder="Describe what your agent should do, or pick a template above..."
+                        value={ruleText}
+                        onChange={(e) => setRuleText(e.target.value)}
+                        className="p-3.5 rounded-xl bg-[#090A0F] border border-[#22252F] text-xs text-white focus:outline-none focus:border-neon-blue/50 min-h-[72px] leading-relaxed resize-none transition-colors placeholder:text-slate-600"
+                      />
+                    </div>
+                  )
+                )}
               </div>
             </div>
 
