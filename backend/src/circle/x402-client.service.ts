@@ -136,12 +136,86 @@ export class X402ClientService {
 
     if (!keyword) return KNOWN_SERVICES;
 
-    const kw = keyword.toLowerCase();
+    // Alias map: common phrasings → canonical service name fragment to match
+    const ALIASES: Record<string, string> = {
+      'twitter': 'x social',
+      'x api': 'x social',
+      'x analytics': 'x social',
+      'social analytics': 'x social',
+      'social media': 'x social',
+      'tweet': 'x social',
+      'x.com': 'x social',
+      'coingecko': 'coingecko',
+      'coin gecko': 'coingecko',
+      'crypto prices': 'coingecko',
+      'token prices': 'coingecko',
+      'market data': 'coingecko',
+      'dex': 'dexscreener',
+      'defi': 'defillama',
+      'tvl': 'defillama',
+      'web search': 'exa',
+      'search web': 'exa',
+      'web scrape': 'firecrawl',
+      'scrape': 'firecrawl',
+      'sms': 'twilio',
+      'text message': 'twilio',
+      'email': 'resend',
+      'send email': 'resend',
+      'voice call': 'bland',
+      'phone call': 'bland',
+      'tts': 'elevenlabs',
+      'text to speech': 'elevenlabs',
+      'audio': 'elevenlabs',
+      'telegram': 'telegram',
+      'dns': 'cloudflare',
+      'domain': 'stabledomains',
+      'ens': 'ens',
+      '.eth': 'ens',
+      'farcaster': 'farcaster',
+      'reddit': 'reddit',
+      'youtube': 'youtube',
+      'transcript': 'youtube',
+      'gpt': 'openai',
+      'gpt-4': 'openai',
+      'claude': 'anthropic',
+      'deepseek': 'deepseek',
+      'replicate': 'replicate',
+      'whisper': 'replicate',
+      'blockchain data': 'goldsky',
+      'onchain data': 'goldsky',
+      'whale': 'goldsky',
+      'dune': 'dune',
+      'sql': 'dune',
+      'company': 'clearbit',
+      'b2b': 'stableenrich',
+      'ip geo': 'abstract',
+      'geolocation': 'abstract',
+      'linkedin': 'proxycurl',
+      'email verify': 'hunter',
+    };
+
+    const kw = keyword.toLowerCase().trim();
+
+    // Check alias map first
+    for (const [alias, canonical] of Object.entries(ALIASES)) {
+      if (kw.includes(alias)) {
+        const results = KNOWN_SERVICES.filter(
+          s =>
+            s.name.toLowerCase().includes(canonical) ||
+            s.description.toLowerCase().includes(canonical) ||
+            (s.category && s.category.toLowerCase().includes(canonical))
+        );
+        if (results.length > 0) return results;
+      }
+    }
+
+    // Direct substring match against name, description, category, provider
     return KNOWN_SERVICES.filter(
       s =>
         s.name.toLowerCase().includes(kw) ||
         s.description.toLowerCase().includes(kw) ||
-        (s.category && s.category.toLowerCase().includes(kw))
+        (s.category && s.category.toLowerCase().includes(kw)) ||
+        (s.provider && s.provider.toLowerCase().includes(kw))
     );
   }
 

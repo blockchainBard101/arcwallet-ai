@@ -27,7 +27,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { agents, rules, isLoadingAgents } = useApp();
+  const { agents, rules, isLoadingAgents, currentTier } = useApp();
   const { logout } = usePrivy();
   const { disconnectWallet } = useApp();
 
@@ -197,8 +197,14 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           onClick={() => router.push("/pricing")}
           className="w-full py-2 px-3 rounded-lg border border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10 font-bold text-xs transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer z-10 flex items-center justify-center gap-2"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          Upgrade to Pro
+          {currentTier === "pro" || currentTier === "power" ? (
+            "Explore Plans"
+          ) : (
+            <>
+              <Sparkles className="w-3.5 h-3.5" />
+              Upgrade to Pro
+            </>
+          )}
         </button>
       </div>
     </aside>

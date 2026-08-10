@@ -559,7 +559,7 @@ const CATEGORIES = [
 
 export default function MarketplacePage() {
   const router = useRouter();
-  const { agents } = useApp();
+  const { agents, currentTier, showUpgradeModal } = useApp();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [services, setServices] = useState<ServiceItem[]>(MARKETPLACE_SERVICES);
@@ -629,6 +629,16 @@ export default function MarketplacePage() {
   });
 
   const handleRunWithAgent = (service: ServiceItem) => {
+    // Gate: nanopayments require Pro or Power tier
+    if (currentTier === "free" || !currentTier) {
+      showUpgradeModal(
+        "Pro Plan Required",
+        `"${service.name}" is a paid marketplace service that uses nanopayments via your Circle USDC vault. This feature is exclusive to Pro and Power subscribers.\n\nUpgrade to Pro to unlock all ${services.length}+ services — web search, crypto data, SMS, email, AI inference, and more — paid per-call with USDC, no API keys required.`,
+        "Pro Feature · Marketplace Services"
+      );
+      return;
+    }
+
     if (!agents || agents.length === 0) {
       setSelectedServiceForModal(service);
       setNoAgentModalOpen(true);
@@ -636,7 +646,7 @@ export default function MarketplacePage() {
     }
 
     if (agents.length === 1) {
-      localStorage.setItem("blockgent_pending_prompt", service.examplePrompt);
+      localStorage.setItem("blockgent_pending_prompt", `Run task using ${service.name}: ${service.examplePrompt}`);
       router.push(`/agents/${agents[0].id}`);
       return;
     }
@@ -806,10 +816,23 @@ export default function MarketplacePage() {
                   </button>
                   <button
                     onClick={() => handleRunWithAgent(service)}
-                    className="px-3 py-1.5 min-h-[34px] rounded-xl bg-neon-blue text-slate-950 text-[11px] font-bold transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1 cursor-pointer shadow-md shadow-neon-blue/10"
+                    className={`px-3 py-1.5 min-h-[34px] rounded-xl text-[11px] font-bold transition-all duration-200 hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1 cursor-pointer shadow-md ${
+                      currentTier === "free" || !currentTier
+                        ? "bg-amber-500/20 border border-amber-500/40 text-amber-300 shadow-amber-500/10"
+                        : "bg-neon-blue text-slate-950 shadow-neon-blue/10"
+                    }`}
                   >
-                    <span>Run</span>
-                    <ArrowRight className="w-3 h-3" />
+                    {currentTier === "free" || !currentTier ? (
+                      <>
+                        <Lock className="w-3 h-3" />
+                        <span>Pro</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Run</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

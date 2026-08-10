@@ -195,11 +195,29 @@ export default function ChatPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        if (err.message?.toLowerCase().includes("limit") || err.message?.toLowerCase().includes("budget") || err.message?.toLowerCase().includes("exceeds")) {
-          addChatMessage("public", `⚠️ Error: ${err.message}`, "agent");
-          showUpgradeModal("Quota Exceeded", err.message);
+        const msg: string = err.message || "";
+        const isProFeature = res.status === 403 ||
+          msg.toLowerCase().includes("pro plan") ||
+          msg.toLowerCase().includes("nanopay") ||
+          msg.toLowerCase().includes("marketplace") ||
+          msg.toLowerCase().includes("paid service") ||
+          msg.toLowerCase().includes("paid api");
+        const isQuotaError = msg.toLowerCase().includes("limit") ||
+          msg.toLowerCase().includes("budget") ||
+          msg.toLowerCase().includes("exceeds");
+
+        if (isProFeature) {
+          addChatMessage("public", "⚡ This feature requires a **Pro plan**. Nanopayments and paid marketplace services are exclusive to Pro subscribers. Upgrade to unlock real-time data, web search, crypto prices, and more.", "agent");
+          showUpgradeModal(
+            "Pro Plan Required",
+            "Nanopayments and paid marketplace services are exclusive to Pro and Power subscribers. Upgrade to unlock real-time data queries, web search, crypto prices, SMS/email APIs, and more paid services — all powered by your Circle USDC wallet.",
+            "Pro Feature · Nanopayments"
+          );
+        } else if (isQuotaError) {
+          addChatMessage("public", `⚠️ ${msg}`, "agent");
+          showUpgradeModal("Quota Exceeded", msg);
         } else {
-          addChatMessage("public", `⚠️ Error: ${err.message || "The explorer agent is currently unavailable."}`, "agent");
+          addChatMessage("public", `⚠️ ${msg || "The explorer agent is currently unavailable."}`, "agent");
         }
         return;
       }

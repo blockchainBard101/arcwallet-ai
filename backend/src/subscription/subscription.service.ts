@@ -89,6 +89,9 @@ export class SubscriptionService {
     if (limits.nanopayBudget === Infinity) return;
 
     if (sub.nanopayUsed + amountUsdc > limits.nanopayBudget) {
+      if (sub.tier === 'free') {
+        throw new ForbiddenException('Nanopayments and external paid services are only available on Pro and Power subscription plans. Please upgrade to Pro.');
+      }
       throw new ForbiddenException(`This call costs $${amountUsdc} USDC, which exceeds your remaining monthly budget of $${limits.nanopayBudget - sub.nanopayUsed}. Please upgrade.`);
     }
   }

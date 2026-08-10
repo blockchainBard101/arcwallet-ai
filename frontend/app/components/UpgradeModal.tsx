@@ -7,9 +7,10 @@ interface UpgradeModalProps {
   onClose: () => void;
   title: string;
   message: string;
+  subtitle?: string;
 }
 
-export function UpgradeModal({ isOpen, onClose, title, message }: UpgradeModalProps) {
+export function UpgradeModal({ isOpen, onClose, title, message, subtitle }: UpgradeModalProps) {
   const router = useRouter();
 
   if (!isOpen) return null;
@@ -33,7 +34,7 @@ export function UpgradeModal({ isOpen, onClose, title, message }: UpgradeModalPr
             </div>
             <div className="flex flex-col">
               <span className="font-extrabold text-white text-lg tracking-tight">{title}</span>
-              <span className="text-[10px] text-slate-500 font-mono">Quota Exceeded / Policy Violation</span>
+              <span className="text-[10px] text-slate-500 font-mono">{subtitle ?? "Quota Exceeded / Policy Violation"}</span>
             </div>
           </div>
           <button 

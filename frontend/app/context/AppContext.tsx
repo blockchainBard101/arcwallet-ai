@@ -107,7 +107,8 @@ interface AppContextType {
   deleteAlert: (id: string) => void;
   clearChat: (chatId: string) => void;
   recentExplorations: string[];
-  showUpgradeModal: (title: string, message: string) => void;
+  showUpgradeModal: (title: string, message: string, subtitle?: string) => void;
+  currentTier: string;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -137,9 +138,10 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
   const [connectedWallet, setConnectedWallet] = useState<Wallet | null>(null);
   const [explorerWallet, setExplorerWallet] = useState<string>("0x71C7656EC7ab88b098defB751B7401B5f6d8976F");
   const [recentExplorations, setRecentExplorations] = useState<string[]>([]);
-  const [upgradeModal, setUpgradeModal] = useState({ isOpen: false, title: "", message: "" });
+  const [upgradeModal, setUpgradeModal] = useState({ isOpen: false, title: "", message: "", subtitle: undefined as string | undefined });
+  const [currentTier, setCurrentTier] = useState<string>("free");
   
-  const showUpgradeModal = (title: string, message: string) => setUpgradeModal({ isOpen: true, title, message });
+  const showUpgradeModal = (title: string, message: string, subtitle?: string) => setUpgradeModal({ isOpen: true, title, message, subtitle });
   const hideUpgradeModal = () => setUpgradeModal(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
@@ -158,8 +160,34 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
       }
     }
   }, []);
+
   const { user: privyUser, authenticated, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
+
+  // Load current subscription tier
+  useEffect(() => {
+    async function loadSubscription() {
+      if (!authenticated) {
+        setCurrentTier("free");
+        return;
+      }
+      try {
+        const token = await getAccessToken();
+        const res = await fetch(`${getBackendUrl()}/subscription`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.tier) setCurrentTier(data.tier.toLowerCase());
+        }
+      } catch (err) {
+        console.warn("Could not fetch subscription tier in AppContext:", err);
+      }
+    }
+    loadSubscription();
+    const interval = setInterval(loadSubscription, 15000);
+    return () => clearInterval(interval);
+  }, [authenticated, getAccessToken]);
 
   // Automatically sync your real Privy EVM wallet address and balances into the frontend session
   useEffect(() => {
@@ -690,6 +718,7 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
         clearChat,
         recentExplorations,
         showUpgradeModal,
+        currentTier,
       }}
     >
       {children}
@@ -697,7 +726,8 @@ export const AppContextInnerProvider: React.FC<{ children: React.ReactNode }> = 
         isOpen={upgradeModal.isOpen} 
         onClose={hideUpgradeModal} 
         title={upgradeModal.title} 
-        message={upgradeModal.message} 
+        message={upgradeModal.message}
+        subtitle={upgradeModal.subtitle}
       />
     </AppContext.Provider>
   );
